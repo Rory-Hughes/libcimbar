@@ -4,68 +4,15 @@
 #include "fountain_decoder_stream.h"
 #include "FountainDecoderLimits.h"
 #include "FountainMetadata.h"
-#include "compression/zstd_decompressor.h"
-#include "compression/zstd_header_check.h"
-#include "serialize/format.h"
-#include "util/File.h"
 
 #include <bitset>
-#include <cstdio>
 #include <chrono>
 #include <deque>
-#include <filesystem>
 #include <functional>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-template <typename OUTSTREAM>
-std::function<std::string(const std::string&, const std::vector<uint8_t>&)> write_on_store(std::string data_dir, bool log_writes=false)
-{
-	return [data_dir, log_writes](const std::string& filename, const std::vector<uint8_t>& data)
-	{
-		std::string file_path = fmt::format("{}/{}", data_dir, filename);
-		OUTSTREAM f(file_path, std::ios::binary);
-		f.write((char*)data.data(), data.size());
-		if (log_writes)
-			printf("%s\n", file_path.c_str());
-		return filename;
-	};
-}
-
-template <typename OUTSTREAM>
-std::function<std::string(const std::string&, const std::vector<uint8_t>&)> write_on_store(const std::filesystem::path& data_dir, bool log_writes=false)
-{
-	return write_on_store<OUTSTREAM>(data_dir.string(), log_writes);
-}
-
-template <typename OUTSTREAM>
-std::function<std::string(const std::string&, const std::vector<uint8_t>&)> decompress_on_store(std::string data_dir, bool log_writes=false)
-{
-	return [data_dir, log_writes](const std::string& fallback_name, const std::vector<uint8_t>& data)
-	{
-		std::string filename = cimbar::zstd_header_check::get_filename(data.data(), data.size());
-		if (!filename.empty())
-			filename = File::basename(filename);
-		if (filename.empty())
-			filename = fallback_name;
-
-		std::string file_path = fmt::format("{}/{}", data_dir, filename);
-		cimbar::zstd_decompressor<OUTSTREAM> f(file_path, std::ios::binary);
-		f.write((char*)data.data(), data.size());
-		if (log_writes)
-			printf("%s\n", file_path.c_str());
-		return filename;
-	};
-}
-
-template <typename OUTSTREAM>
-std::function<std::string(const std::string&, const std::vector<uint8_t>&)> decompress_on_store(const std::filesystem::path& data_dir, bool log_writes=false)
-{
-	return decompress_on_store<OUTSTREAM>(data_dir.string(), log_writes);
-}
-
 
 class fountain_decoder_sink
 {
@@ -87,6 +34,9 @@ public:
 	static constexpr int64_t transfer_duration_exceeded = -20;
 	static constexpr int64_t active_object_bytes_limit_reached = -21;
 	static constexpr int64_t transfer_already_completed = -22;
+	static constexpr int64_t frame_size_misaligned = -23;
+	static constexpr int64_t conflicting_packet_metadata = -24;
+	static constexpr int64_t block_id_exceeds_limit = -25;
 	static constexpr std::size_t encode_id_count = 128U;
 
 	fountain_decoder_sink(
@@ -114,7 +64,7 @@ public:
 
 	std::string get_filename(const FountainMetadata& md) const
 	{
-		return fmt::format("{}.{}", md.encode_id(), md.file_size());
+		return std::to_string(md.encode_id()) + "." + std::to_string(md.file_size());
 	}
 
 	bool store(const FountainMetadata& md, fountain_decoder_stream& s)
@@ -248,6 +198,20 @@ public:
 		    static_cast<uint64_t>(_chunkSize) * _limits.maximum_packets_per_frame;
 		if (static_cast<uint64_t>(size) > maximum_frame_size)
 			return frame_size_exceeds_limit;
+		if (size < _chunkSize || size % _chunkSize != 0U)
+			return frame_size_misaligned;
+
+		// Validate every packet before creating or mutating decoder state. A frame
+		// may batch packets, but all packets must belong to the same transfer and
+		// each block identifier must satisfy the selected policy.
+		for (unsigned offset = 0U; offset < size; offset += _chunkSize)
+		{
+			FountainMetadata packet(data + offset, _chunkSize);
+			if (packet.id() != md.id())
+				return conflicting_packet_metadata;
+			if (packet.block_id() > _limits.maximum_block_id)
+				return block_id_exceeds_limit;
+		}
 
 		const time_point now = _now();
 		expire_transfers(now);

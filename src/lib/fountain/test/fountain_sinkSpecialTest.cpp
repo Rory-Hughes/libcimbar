@@ -3,7 +3,7 @@
 
 #include "FountainMetadata.h"
 #include "fountain_encoder_stream.h"
-#include "fountain_decoder_sink.h"
+#include "fountain_decoder_file_sink.h"
 
 #include "serialize/format.h"
 #include "util/File.h"

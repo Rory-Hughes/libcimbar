@@ -17,6 +17,7 @@ constexpr unsigned chunk_size = 128U;
 constexpr unsigned packet_size = chunk_size - FountainMetadata::md_size;
 constexpr unsigned max_object_size = 4096U;
 constexpr unsigned max_unique_blocks = 64U;
+constexpr unsigned max_block_id = 96U;
 constexpr unsigned max_active_streams = 1U;
 constexpr unsigned max_completed_transfers = 2U;
 constexpr unsigned max_cancelled_transfers = 2U;
@@ -38,6 +39,7 @@ FountainDecoderLimits fuzz_limits()
 	limits.maximum_object_size = max_object_size;
 	limits.maximum_active_object_bytes = max_object_size;
 	limits.maximum_unique_blocks = max_unique_blocks;
+	limits.maximum_block_id = max_block_id;
 	limits.maximum_active_streams = max_active_streams;
 	limits.maximum_completed_transfers = max_completed_transfers;
 	limits.maximum_cancelled_transfers = max_cancelled_transfers;
@@ -141,7 +143,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
 		const std::uint8_t operation = data[offset++];
 		const std::size_t remaining = size - offset;
 
-		switch (operation % 9U)
+		switch (operation % 10U)
 		{
 		case 0U:
 		{
@@ -283,6 +285,22 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
 				);
 				if (sink.is_done(metadata.id()) || sink.is_cancelled(metadata.id()))
 					break;
+			}
+			break;
+		}
+		case 9U:
+		{
+			const frame first = make_frame(0U, 1U, 0U, nullptr, 0U);
+			const frame conflicting = make_frame(1U, 1U, 1U, nullptr, 0U);
+			std::array<std::uint8_t, chunk_size * 2U> batched{};
+			std::copy(first.begin(), first.end(), batched.begin());
+			std::copy(conflicting.begin(), conflicting.end(), batched.begin() + chunk_size);
+			if (sink.decode_frame(
+			        reinterpret_cast<const char*>(batched.data()),
+			        static_cast<unsigned>(batched.size())
+			    ) != fountain_decoder_sink::conflicting_packet_metadata)
+			{
+				invariant_failure();
 			}
 			break;
 		}

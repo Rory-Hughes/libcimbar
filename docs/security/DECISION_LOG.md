@@ -101,6 +101,28 @@ Record significant audit and hardening decisions here. Do not silently change a 
 - **Compatibility consequences:** A sender cannot reuse an encode ID for a different object without an explicit receiver reset. Generic multi-object workflows that require reuse must use distinct sessions or a future versioned transport with a generation field.
 - **Validation required:** Unit-test replay after detail eviction, conflicting file sizes with the same encode ID, explicit sink and C-API reset, cleared recovered output, and successful re-use after reset. Assert the same property in the state-machine fuzzer.
 
+## ADR-LC-013: Validate every fountain packet before state mutation
+
+- **Status:** Accepted
+- **Context:** `decode_frame()` accepts multiple concatenated fountain packets. It parsed and policy-checked only the first six-byte header, while `fountain_decoder_stream` silently discarded the first four bytes of every later packet and forwarded their block IDs and payloads to the first transfer's Wirehair decoder. A later packet could therefore carry conflicting transfer metadata or an out-of-policy block ID without rejection.
+- **Decision:** Require each `decode_frame()` input to contain one or more complete configured chunks. Before time accounting, allocation, or decoder mutation, parse every packet header, require the same full transfer ID as the first packet, and enforce a policy-selected maximum block ID for every packet.
+- **Reason:** Packet batching is an untrusted container boundary. Validating only its first element made the transfer identity and block policy incomplete and allowed mixed-transfer payloads to reach one reconstruction context.
+- **Alternatives considered:** Validate only at the browser C API, teach the stream to maintain partial-header validation state, or accept mixed packets and rely on downstream object authentication. Browser-only checks leave generic callers exposed, partial buffering adds state and ambiguity, and downstream authentication does not excuse emitting transport-corrupted objects.
+- **Security consequences:** Mixed-transfer batches, partial chunks, and excessive block IDs fail without allocating or mutating decoder state. The decoder no longer accepts arbitrary byte fragmentation through `decode_frame()`; callers must submit complete fountain chunks.
+- **Compatibility consequences:** Callers that previously streamed partial chunks must buffer to the configured chunk boundary. Existing browser, CLI, and encoder-generated calls already submit aligned chunks.
+- **Validation required:** Unit-test misalignment, conflicting metadata in later packets, excessive block IDs, no state mutation on rejection, and valid multi-packet completion. Exercise mixed-packet rejection in the state-machine fuzzer and rerun the full sanitizer suite.
+
+## ADR-LC-014: Introduce a policy-required single-take fountain session
+
+- **Status:** Accepted
+- **Context:** The generic sink supports caller callbacks, synthesized filenames, completed-detail maps, decompression helpers, and filesystem writers. Those features are incompatible with the restricted optical transport boundary, and the core sink header transitively pulled zstd, path, file, and formatting dependencies into every consumer.
+- **Decision:** Add `FountainTransferPolicy` with a required known object class, one-active-transfer limits, and zero retained completed-detail records, and wrap the core sink in `fountain_decoder_session`. The wrapper fails closed on decoder rejection, recovers only the exact validated length, owns at most one completed byte vector, and transfers it once through `take_completed_object()`. Move generic file and decompression callbacks into `fountain_decoder_file_sink.h`; compatibility applications must include it explicitly.
+- **Reason:** The product-facing reconstruction boundary should make unsafe output semantics unavailable by construction rather than relying on each caller to avoid generic helpers.
+- **Alternatives considered:** Continue documenting safe use of `fountain_decoder_sink`, delete generic applications immediately, or place the restricted behavior in the browser C API. Documentation alone leaves dangerous capabilities adjacent, immediate deletion would unnecessarily break the fork's reference tools, and the browser/WASM surface is explicitly excluded from the eventual product profile.
+- **Security consequences:** Restricted consumers cannot select filenames, write files, decompress, register output callbacks, or observe partial objects through the session API. A completed object has one owner and one take. Negative submissions clear decoder state and require explicit reset.
+- **Compatibility consequences:** Generic tools retain their existing behavior by including the new compatibility header. Sources that accidentally relied on the sink header for zstd or formatting declarations must add direct includes.
+- **Validation required:** Test invalid policies, exact-byte recovery, second-take refusal, post-completion submission refusal, fail-closed oversized metadata, cancellation, reset, and generic compatibility builds. Add deterministic allocation/output-refusal testing before closing WP-07.
+
 ## New decision template
 
 ### ADR-LC-NNN: Title

@@ -63,6 +63,21 @@ public:
 
 The final API may differ, but it must preserve explicit policy, bounded output, single completion, deterministic cancellation, and no filesystem semantics.
 
+### Implemented fountain-stage boundary
+
+`fountain_decoder_session` now provides the reconstruction-stage portion of
+this contract. Construction requires a valid `FountainTransferPolicy` with an
+explicit object class and decoder limits. The session exposes only status,
+frame submission, cancellation/reset, and a single-take exact-length byte
+vector. It has no output callback, filename, path, decompression, or filesystem
+interface. Any negative decoder result fails the session closed and clears
+partial state; explicit reset is required before reuse.
+
+Generic file/decompression callbacks remain available only through
+`fountain_decoder_file_sink.h` for compatibility applications. The restricted
+header does not include those dependencies. The full raw-frame `DecoderSession`
+and dedicated product build target remain outstanding.
+
 ## Initial object profiles
 
 These values are provisional and require benchmarking.

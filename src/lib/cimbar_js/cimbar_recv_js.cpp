@@ -2,11 +2,13 @@
 #include "cimbar_recv_js.h"
 
 #include "cimb_translator/Config.h"
+#include "compression/zstd_decompressor.h"
 #include "compression/zstd_header_check.h"
 #include "encoder/Decoder.h"
 #include "encoder/escrow_buffer_writer.h"
 #include "extractor/Extractor.h"
 #include "fountain/fountain_decoder_sink.h"
+#include "serialize/format.h"
 #include "serialize/str_join.h"
 #include "util/File.h"
 #include "util/Timer.h"

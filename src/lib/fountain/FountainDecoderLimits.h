@@ -9,6 +9,7 @@ struct FountainDecoderLimits
 {
 	// The existing six-byte metadata format carries a 25-bit object size.
 	static constexpr unsigned protocol_maximum_object_size = (1U << 25U) - 1U;
+	static constexpr unsigned protocol_maximum_block_id = (1U << 16U) - 1U;
 	static constexpr unsigned wirehair_maximum_blocks = 64000U;
 	static constexpr unsigned extra_unique_blocks = 1024U;
 
@@ -20,6 +21,8 @@ struct FountainDecoderLimits
 	unsigned maximum_active_streams = 1U;
 	unsigned maximum_completed_transfers = 8U;
 	unsigned maximum_unique_blocks = 0U;
+	// Enforced for every packet in a batched frame before Wirehair sees it.
+	unsigned maximum_block_id = protocol_maximum_block_id;
 	unsigned maximum_packets_per_frame = 16U;
 	unsigned maximum_frames_per_transfer = wirehair_maximum_blocks;
 	unsigned maximum_no_progress_frames = extra_unique_blocks;
@@ -33,6 +36,7 @@ struct FountainDecoderLimits
 		       maximum_object_size <= protocol_maximum_object_size &&
 		       maximum_active_object_bytes >= maximum_object_size &&
 		       maximum_active_streams > 0U &&
+		       maximum_block_id <= protocol_maximum_block_id &&
 		       maximum_packets_per_frame > 0U &&
 		       maximum_frames_per_transfer > 0U &&
 		       maximum_no_progress_frames > 0U &&

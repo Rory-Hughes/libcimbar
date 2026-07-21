@@ -3,7 +3,7 @@
 #include "compression/zstd_decompressor.h"
 #include "encoder/Decoder.h"
 #include "extractor/Extractor.h"
-#include "fountain/fountain_decoder_sink.h"
+#include "fountain/fountain_decoder_file_sink.h"
 #include "gui/window_glfw.h"
 
 #include "cxxopts/cxxopts.hpp"

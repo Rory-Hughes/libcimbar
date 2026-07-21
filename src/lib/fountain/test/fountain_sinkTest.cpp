@@ -3,7 +3,8 @@
 
 #include "FountainMetadata.h"
 #include "fountain_encoder_stream.h"
-#include "fountain_decoder_sink.h"
+#include "fountain_decoder_file_sink.h"
+#include "fountain_decoder_session.h"
 
 #include "serialize/format.h"
 #include "serialize/str_join.h"
@@ -21,9 +22,11 @@ using std::string;
 using namespace std;
 
 namespace {
-	std::array<char, FountainMetadata::md_size> metadata_frame(uint8_t encode_id, unsigned size, uint16_t block_id=0)
+	constexpr std::size_t test_chunk_size = 690U;
+
+	std::array<char, test_chunk_size> metadata_frame(uint8_t encode_id, unsigned size, uint16_t block_id=0)
 	{
-		std::array<char, FountainMetadata::md_size> frame{};
+		std::array<char, test_chunk_size> frame{};
 		FountainMetadata::to_uint8_arr(
 		    encode_id,
 		    size,
@@ -61,6 +64,22 @@ namespace {
 		stringstream input = dummyContents(size);
 		fountain_encoder_stream::ptr fes = fountain_encoder_stream::create(input, 690, encode_id);
 		return createFrame(*fes);
+	}
+
+	FountainTransferPolicy secure_message_policy(unsigned maximum_object_size=2048U)
+	{
+		FountainTransferPolicy policy;
+		policy.object_class = FountainObjectClass::message;
+		policy.decoder_limits.maximum_object_size = maximum_object_size;
+		policy.decoder_limits.maximum_active_object_bytes = maximum_object_size;
+		policy.decoder_limits.maximum_active_streams = 1U;
+		policy.decoder_limits.maximum_completed_transfers = 0U;
+		policy.decoder_limits.maximum_unique_blocks = 64U;
+		policy.decoder_limits.maximum_block_id = 64U;
+		policy.decoder_limits.maximum_packets_per_frame = 16U;
+		policy.decoder_limits.maximum_frames_per_transfer = 64U;
+		policy.decoder_limits.maximum_no_progress_frames = 16U;
+		return policy;
 	}
 }
 
@@ -305,6 +324,55 @@ TEST_CASE( "FountainSinkTest/testRejectsOversizedFrame", "[unit]" )
 	assertEquals( 0, sink.num_streams() );
 }
 
+TEST_CASE( "FountainSinkTest/testRejectsMisalignedFrameBeforeStateMutation", "[unit]" )
+{
+	FountainDecoderLimits limits;
+	limits.maximum_packets_per_frame = 2;
+	fountain_decoder_sink sink(test_chunk_size, nullptr, limits);
+	const auto frame = metadata_frame(4, 20000);
+	std::vector<char> misaligned(frame.begin(), frame.end());
+	misaligned.push_back(0);
+
+	assertEquals(
+	    fountain_decoder_sink::frame_size_misaligned,
+	    sink.decode_frame(misaligned.data(), static_cast<unsigned>(misaligned.size()))
+	);
+	assertEquals(0, sink.num_streams());
+}
+
+TEST_CASE( "FountainSinkTest/testRejectsConflictingMetadataInsideBatchedFrame", "[unit]" )
+{
+	FountainDecoderLimits limits;
+	limits.maximum_packets_per_frame = 2;
+	fountain_decoder_sink sink(test_chunk_size, nullptr, limits);
+	const auto first = metadata_frame(4, 20000, 0);
+	const auto conflicting = metadata_frame(5, 20000, 1);
+	std::vector<char> batched;
+	batched.insert(batched.end(), first.begin(), first.end());
+	batched.insert(batched.end(), conflicting.begin(), conflicting.end());
+
+	assertEquals(
+	    fountain_decoder_sink::conflicting_packet_metadata,
+	    sink.decode_frame(batched.data(), static_cast<unsigned>(batched.size()))
+	);
+	assertEquals(0, sink.num_streams());
+	assertEquals(0, sink.active_object_bytes());
+}
+
+TEST_CASE( "FountainSinkTest/testRejectsBlockIdentifierAbovePolicy", "[unit]" )
+{
+	FountainDecoderLimits limits;
+	limits.maximum_block_id = 10;
+	fountain_decoder_sink sink(test_chunk_size, nullptr, limits);
+	const auto frame = metadata_frame(4, 20000, 11);
+
+	assertEquals(
+	    fountain_decoder_sink::block_id_exceeds_limit,
+	    sink.decode_frame(frame.data(), static_cast<unsigned>(frame.size()))
+	);
+	assertEquals(0, sink.num_streams());
+}
+
 TEST_CASE( "FountainSinkTest/testCancelsTransferAfterNoProgress", "[unit]" )
 {
 	FountainDecoderLimits limits;
@@ -314,6 +382,7 @@ TEST_CASE( "FountainSinkTest/testCancelsTransferAfterNoProgress", "[unit]" )
 	const auto frame = metadata_frame(5, 2048);
 	const FountainMetadata md(frame.data(), frame.size());
 
+	assertEquals( 0, sink.decode_frame(frame.data(), frame.size()) );
 	assertEquals( 0, sink.decode_frame(frame.data(), frame.size()) );
 	assertEquals(
 	    fountain_decoder_sink::no_progress_limit_reached,
@@ -335,7 +404,7 @@ TEST_CASE( "FountainSinkTest/testCancelsTransferAfterNoProgress", "[unit]" )
 TEST_CASE( "FountainSinkTest/testBoundsCancelledTransferCache", "[unit]" )
 {
 	FountainDecoderLimits limits;
-	limits.maximum_frames_per_transfer = 1;
+	limits.maximum_frames_per_transfer = 2;
 	limits.maximum_no_progress_frames = 1;
 	limits.maximum_cancelled_transfers = 1;
 	fountain_decoder_sink sink(690, nullptr, limits);
@@ -344,10 +413,12 @@ TEST_CASE( "FountainSinkTest/testBoundsCancelledTransferCache", "[unit]" )
 	const FountainMetadata first_md(first.data(), first.size());
 	const FountainMetadata second_md(second.data(), second.size());
 
+	assertEquals(0, sink.decode_frame(first.data(), first.size()));
 	assertEquals(
 	    fountain_decoder_sink::no_progress_limit_reached,
 	    sink.decode_frame(first.data(), first.size())
 	);
+	assertEquals(0, sink.decode_frame(second.data(), second.size()));
 	assertEquals(
 	    fountain_decoder_sink::no_progress_limit_reached,
 	    sink.decode_frame(second.data(), second.size())
@@ -427,4 +498,81 @@ TEST_CASE( "FountainSinkTest/testRejectsNullFrame", "[unit]" )
 	    fountain_decoder_sink::frame_too_short,
 	    sink.decode_frame(nullptr, FountainMetadata::md_size)
 	);
+}
+
+TEST_CASE( "FountainDecoderSession/testReturnsExactOpaqueObjectOnce", "[unit]" )
+{
+	fountain_decoder_session session(test_chunk_size, secure_message_policy());
+	const string encoded = createFrame(0, 1200);
+	const string expected = dummyContents(1200).str();
+
+	assertTrue(session.good());
+	assertEquals(FountainObjectClass::message, session.object_class());
+	assertEquals(1, session.submit_frame(encoded.data(), static_cast<unsigned>(encoded.size())));
+	assertEquals(FountainSessionStatus::completed, session.status());
+	assertTrue(session.has_completed_object());
+
+	auto object = session.take_completed_object();
+	assertTrue(object.has_value());
+	assertEquals(expected.size(), object->size());
+	assertTrue(std::equal(expected.begin(), expected.end(), object->begin()));
+	assertEquals(FountainSessionStatus::object_taken, session.status());
+	assertFalse(session.has_completed_object());
+	assertFalse(session.take_completed_object().has_value());
+	assertEquals(
+	    fountain_decoder_session::session_not_receiving,
+	    session.submit_frame(encoded.data(), static_cast<unsigned>(encoded.size()))
+	);
+}
+
+TEST_CASE( "FountainDecoderSession/testRejectsInvalidPolicyAndFailsClosed", "[unit]" )
+{
+	FountainTransferPolicy invalid_policy;
+	invalid_policy.object_class = FountainObjectClass::message;
+	invalid_policy.decoder_limits.maximum_object_size = 2048U;
+	fountain_decoder_session invalid(test_chunk_size, invalid_policy);
+	const auto frame = metadata_frame(0, 1200);
+
+	assertFalse(invalid.good());
+	assertEquals(
+	    fountain_decoder_session::invalid_policy,
+	    invalid.submit_frame(frame.data(), static_cast<unsigned>(frame.size()))
+	);
+	FountainTransferPolicy retained_details = secure_message_policy();
+	retained_details.decoder_limits.maximum_completed_transfers = 1U;
+	fountain_decoder_session invalid_details(test_chunk_size, retained_details);
+	assertFalse(invalid_details.good());
+
+	fountain_decoder_session session(test_chunk_size, secure_message_policy(1024U));
+	const auto oversized = metadata_frame(0, 1025);
+	assertEquals(
+	    fountain_decoder_sink::object_size_exceeds_limit,
+	    session.submit_frame(oversized.data(), static_cast<unsigned>(oversized.size()))
+	);
+	assertEquals(FountainSessionStatus::failed, session.status());
+	assertFalse(session.has_completed_object());
+	assertEquals(
+	    fountain_decoder_session::session_not_receiving,
+	    session.submit_frame(frame.data(), static_cast<unsigned>(frame.size()))
+	);
+
+	session.reset();
+	assertEquals(FountainSessionStatus::receiving, session.status());
+}
+
+TEST_CASE( "FountainDecoderSession/testCancelClearsUntakenOutput", "[unit]" )
+{
+	fountain_decoder_session session(test_chunk_size, secure_message_policy());
+	const string encoded = createFrame(0, 1200);
+
+	assertEquals(1, session.submit_frame(encoded.data(), static_cast<unsigned>(encoded.size())));
+	assertTrue(session.has_completed_object());
+	session.cancel();
+	assertEquals(FountainSessionStatus::cancelled, session.status());
+	assertFalse(session.has_completed_object());
+	assertFalse(session.take_completed_object().has_value());
+
+	session.reset();
+	assertEquals(FountainSessionStatus::receiving, session.status());
+	assertEquals(1, session.submit_frame(encoded.data(), static_cast<unsigned>(encoded.size())));
 }

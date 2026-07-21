@@ -83,8 +83,8 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 - [x] Reject object size before decoder allocation.
 - [x] Limit the default active transfer count to one.
 - [x] Bound unique-block tracking and completed-transfer retention.
-- [ ] Define `TransferPolicy` and object classes selected by the Secure Core.
-- [x] Limit block identifiers, packets per frame, frames, and no-progress frames.
+- [x] Define the fountain-stage `FountainTransferPolicy` and object classes selected by the Secure Core.
+- [x] Validate every packet in a frame and limit block identifiers, packets per frame, frames, and no-progress frames.
 - [x] Limit transfer duration and aggregate active object bytes across streams.
 - [ ] Instrument or otherwise bound third-party codec overhead against a total decoder memory budget.
 - [x] Define deterministic cancel and reset with bounded cancellation retention.
@@ -97,10 +97,10 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 **Priority:** P0  
 **Dependencies:** WP-06
 
-- [ ] Design `DecoderSession` API.
-- [ ] Return exact-length opaque bytes only.
-- [ ] Remove filename, MIME, path, and application-route semantics.
-- [ ] Ensure partial objects never cross the API.
+- [x] Add a policy-required fountain-stage decoder session API.
+- [x] Return exact-length opaque bytes through a single-take ownership transfer.
+- [x] Keep filename, MIME, path, callback, and application-route semantics out of the restricted API; isolate generic filesystem helpers in a compatibility header.
+- [x] Ensure partial objects never cross the restricted API.
 - [ ] Test allocation failure and output refusal.
 
 **Exit:** The decoder has no generic file or application action interface.
