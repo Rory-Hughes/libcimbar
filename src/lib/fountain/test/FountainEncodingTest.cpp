@@ -177,3 +177,16 @@ TEST_CASE( "FountainEncodingTest/testWhichN", "[unit]" )
 	assertEquals( 10, decoder.progress() );
 }
 
+TEST_CASE( "FountainEncodingTest/testRejectsUniqueBlocksBeyondLimit", "[unit]" )
+{
+	FountainDecoder decoder(128, 32, 1);
+	std::array<uint8_t, 32> block{};
+
+	assertTrue( decoder.good() );
+	assertFalse( decoder.decode(0, block.data(), block.size()) );
+	assertEquals( 1, decoder.progress() );
+	assertFalse( decoder.decode(1, block.data(), block.size()) );
+	assertEquals( Wirehair_InvalidInput, decoder.last_result() );
+	assertEquals( 1, decoder.progress() );
+}
+

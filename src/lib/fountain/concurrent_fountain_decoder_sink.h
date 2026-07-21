@@ -5,18 +5,24 @@
 
 #include "concurrentqueue/concurrentqueue.h"
 #include <mutex>
+#include <utility>
 
 class concurrent_fountain_decoder_sink
 {
 public:
-	concurrent_fountain_decoder_sink(unsigned chunk_size, const std::function<std::string(const std::string&, const std::vector<uint8_t>&)>& on_store=nullptr)
-		: _decoder(chunk_size, on_store)
+	concurrent_fountain_decoder_sink(
+	    unsigned chunk_size,
+	    const std::function<std::string(const std::string&, const std::vector<uint8_t>&)>& on_store=nullptr,
+	    FountainDecoderLimits limits=FountainDecoderLimits(),
+	    fountain_decoder_sink::now_function now=[] { return fountain_decoder_sink::clock::now(); }
+	)
+		: _decoder(chunk_size, on_store, limits, std::move(now))
 	{
 	}
 
 	bool good() const
 	{
-		return true;
+		return _decoder.good();
 	}
 
 	unsigned chunk_size() const

@@ -2,9 +2,11 @@
 
 This directory contains security-focused fuzzing scaffolding for the hardened libcimbar fork. It is intentionally separate from the upstream build until harnesses and dependency assumptions are validated.
 
-## Initial target
+## Current targets
 
 `fuzz_fountain_metadata` exercises the six-byte fountain metadata parser and its field accessors under libFuzzer, AddressSanitizer, and UndefinedBehaviorSanitizer.
+
+`fuzz_fountain_state` drives bounded start, frame, recover, and reset operations through `fountain_decoder_sink`. It uses a 64 KiB object limit, one active stream, 128 unique blocks, and two retained completion records, so arbitrary inputs cannot trigger large decoder allocations.
 
 Build locally with a recent Clang and CMake:
 
@@ -12,21 +14,20 @@ Build locally with a recent Clang and CMake:
 cmake -S fuzz -B out/fuzz -G Ninja -DCMAKE_CXX_COMPILER=clang++
 cmake --build out/fuzz
 ./out/fuzz/fuzz_fountain_metadata -runs=100000
+./out/fuzz/fuzz_fountain_state -runs=10000 -max_len=512
 ```
 
 ## Planned targets
 
 1. `fuzz_fountain_metadata`
    - Raw metadata parsing and canonical field round trip.
-2. `fuzz_fountain_state`
-   - Structured sequences of start, block, duplicate, conflict, recover, cancel, timeout, and reset operations.
-3. `fuzz_corrected_payload`
+2. `fuzz_corrected_payload`
    - Fast fuzzing after symbol and ECC extraction but before fountain reconstruction.
-4. `fuzz_raw_frame`
+3. `fuzz_raw_frame`
    - Fixed-format raw image input through geometry and symbol extraction.
-5. `fuzz_frame_sequence`
+4. `fuzz_frame_sequence`
    - Reordered, duplicated, dropped, delayed, and mutated camera frames.
-6. `fuzz_zstd_filename_upstream`
+5. `fuzz_zstd_filename_upstream`
    - Audit-only coverage for generic upstream decompression and filename paths; excluded from the product profile.
 
 ## Harness rules

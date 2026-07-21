@@ -1,5 +1,6 @@
 #include "FountainMetadata.h"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -19,12 +20,16 @@ namespace {
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size)
 {
-    if (data == nullptr || size < FountainMetadata::md_size)
+    if (data == nullptr)
         return 0;
+
+    const unsigned metadata_size = static_cast<unsigned>(
+        std::min(size, static_cast<std::size_t>(FountainMetadata::md_size))
+    );
 
     FountainMetadata parsed(
         reinterpret_cast<const char*>(data),
-        FountainMetadata::md_size
+        metadata_size
     );
 
     const std::uint8_t encode_id = parsed.encode_id();

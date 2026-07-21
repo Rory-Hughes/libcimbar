@@ -20,8 +20,8 @@ TEST_CASE( "EncoderRoundTripTest/testFountain.Pad", "[unit]" )
 {
 	MakeTempDirectory tempdir;
 
-	std::string inputFile = tempdir.path() / "hello.txt";
-	std::string outPrefix = tempdir.path() / "encoder.fountain";
+	std::string inputFile = (tempdir.path() / "hello.txt").string();
+	std::string outPrefix = (tempdir.path() / "encoder.fountain").string();
 
 	{
 		std::ofstream f(inputFile);
@@ -71,8 +71,8 @@ TEST_CASE( "EncoderRoundTripTest/testFountain.SinkMismatch", "[unit]" )
 	MakeTempDirectory tempdir;
 	ConfigScope cs(4);
 
-	std::string inputFile = tempdir.path() / "hello.txt";
-	std::string outPrefix = tempdir.path() / "encoder.fountain";
+	std::string inputFile = (tempdir.path() / "hello.txt").string();
+	std::string outPrefix = (tempdir.path() / "encoder.fountain").string();
 
 	{
 		std::ofstream f(inputFile);

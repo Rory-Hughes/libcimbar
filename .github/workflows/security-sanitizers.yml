@@ -85,6 +85,12 @@ jobs:
             -max_len=256 \
             -timeout=5 \
             -artifact_prefix=out/fuzz-artifacts/
+          ./out/fuzz/fuzz_fountain_state \
+            -runs=10000 \
+            -max_len=512 \
+            -rss_limit_mb=256 \
+            -timeout=5 \
+            -artifact_prefix=out/fuzz-artifacts/
 
       - name: Upload crash artifacts
         if: failure()

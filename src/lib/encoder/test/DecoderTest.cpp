@@ -28,7 +28,7 @@ TEST_CASE( "DecoderTest/testDecode", "[unit]" )
 	MakeTempDirectory tempdir;
 
 	DecoderPlus dec(false);
-	std::string decodedFile = tempdir.path() / "testDecode.txt";
+	std::string decodedFile = (tempdir.path() / "testDecode.txt").string();
 	unsigned bytesDecoded = dec.decode(TestCimbar::getSample("b/tr_0.png"), decodedFile);
 	assertEquals( 9300, bytesDecoded );
 
@@ -40,7 +40,7 @@ TEST_CASE( "DecoderTest/testDecodeEcc", "[unit]" )
 	MakeTempDirectory tempdir;
 
 	DecoderPlus dec;
-	std::string decodedFile = tempdir.path() / "testDecode.txt";
+	std::string decodedFile = (tempdir.path() / "testDecode.txt").string();
 	unsigned bytesDecoded = dec.decode(TestCimbar::getSample("b/tr_0.png"), decodedFile);
 	assertEquals( 7500, bytesDecoded );
 
@@ -53,7 +53,7 @@ TEST_CASE( "DecoderTest/testDecode.Sample", "[unit]" )
 	MakeTempDirectory tempdir;
 
 	DecoderPlus dec(false);
-	std::string decodedFile = tempdir.path() / "testDecode.txt";
+	std::string decodedFile = (tempdir.path() / "testDecode.txt").string();
 	unsigned bytesDecoded = dec.decode(TestCimbar::getSample("b/scan2434.jpg"), decodedFile);
 	assertEquals( 9300, bytesDecoded );
 
@@ -69,7 +69,7 @@ TEST_CASE( "DecoderTest/testDecode.4c", "[unit]" )
 	cs.active_conf().ecc_bytes = 0;
 
 	DecoderPlus dec;
-	std::string decodedFile = tempdir.path() / "testDecode.txt";
+	std::string decodedFile = (tempdir.path() / "testDecode.txt").string();
 	unsigned bytesDecoded = dec.decode(TestCimbar::getSample("6bit/4color_ecc30_fountain_0.png"), decodedFile);
 	assertEquals( 9300, bytesDecoded );
 
@@ -82,7 +82,7 @@ TEST_CASE( "DecoderTest/testDecodeEcc.4c", "[unit]" )
 	ConfigScope cs(4);
 
 	DecoderPlus dec;
-	std::string decodedFile = tempdir.path() / "testDecode.txt";
+	std::string decodedFile = (tempdir.path() / "testDecode.txt").string();
 	unsigned bytesDecoded = dec.decode(TestCimbar::getSample("6bit/4color_ecc30_fountain_0.png"), decodedFile);
 	assertEquals( 7500, bytesDecoded );
 
@@ -97,7 +97,7 @@ TEST_CASE( "DecoderTest/testDecode.Sample4c", "[unit]" )
 	cs.active_conf().ecc_bytes = 0;
 
 	DecoderPlus dec;
-	std::string decodedFile = tempdir.path() / "testDecode.txt";
+	std::string decodedFile = (tempdir.path() / "testDecode.txt").string();
 	unsigned bytesDecoded = dec.decode(TestCimbar::getSample("6bit/4_30_f0_627_extract.jpg"), decodedFile);
 	assertEquals( 9300, bytesDecoded );
 

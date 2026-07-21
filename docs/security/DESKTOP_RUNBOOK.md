@@ -66,6 +66,15 @@ sudo apt install -y \
   libgles2-mesa-dev
 ```
 
+On Windows with the local MinGW/vcpkg toolchain, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-windows-vcpkg.ps1
+```
+
+The Windows setup builds the non-GUI audit baseline with `LIBCIMBAR_BUILD_GUI_TOOLS=OFF`.
+The live GLFW/OpenGL send and receive tools need a separate OpenGL ES function loader or implementation on Windows.
+
 ## 3. Reproduce the frozen baseline
 
 Use a detached worktree so the baseline cannot be accidentally modified:

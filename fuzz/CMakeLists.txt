@@ -36,3 +36,32 @@ add_libcimbar_fuzzer(
 target_include_directories(fuzz_fountain_metadata PRIVATE
     "${LIBCIMBAR_ROOT}/src/lib/fountain"
 )
+
+add_subdirectory(
+    "${LIBCIMBAR_ROOT}/src/third_party_lib/wirehair"
+    "${CMAKE_CURRENT_BINARY_DIR}/wirehair"
+)
+add_subdirectory(
+    "${LIBCIMBAR_ROOT}/src/third_party_lib/zstd"
+    "${CMAKE_CURRENT_BINARY_DIR}/zstd"
+)
+target_compile_options(wirehair PRIVATE
+    -fno-omit-frame-pointer
+    -fsanitize=address,undefined
+)
+target_compile_options(zstd PRIVATE
+    -fno-omit-frame-pointer
+    -fsanitize=address,undefined
+)
+
+add_libcimbar_fuzzer(
+    fuzz_fountain_state
+    fuzz_fountain_state.cpp
+)
+
+target_include_directories(fuzz_fountain_state PRIVATE
+    "${LIBCIMBAR_ROOT}/src/lib"
+    "${LIBCIMBAR_ROOT}/src/lib/fountain"
+    "${LIBCIMBAR_ROOT}/src/third_party_lib"
+)
+target_link_libraries(fuzz_fountain_state PRIVATE wirehair zstd)

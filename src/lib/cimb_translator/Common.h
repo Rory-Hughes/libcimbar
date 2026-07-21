@@ -2,11 +2,18 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <string>
 
 namespace cimbar
 {
 	using RGB = std::tuple<uchar,uchar,uchar>;
+
+	namespace detail
+	{
+		cv::Mat decode_image(const uint8_t* data, std::size_t size);
+	}
 
 	cv::Mat load_img(std::string path);
 

@@ -7,42 +7,44 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 **Priority:** P0  
 **Dependencies:** None
 
-- [ ] Verify `audit-baseline-681e18e` resolves to `681e18eb61a059f4a796bc6ef097d24b45c430eb`.
-- [ ] Record submodule state.
-- [ ] Build in a clean environment.
-- [ ] Run CTest and Python usage tests.
-- [ ] Hash binaries.
-- [ ] Record linked libraries.
+- [x] Verify origin/audit-baseline-681e18e resolves to 681e18eb61a059f4a796bc6ef097d24b45c430eb.
+- [x] Record submodule state.
+- [ ] Build and install the full baseline target set in a clean environment.
+- [ ] Run the complete CTest suite.
+- [x] Run Python usage tests against the built baseline cimbar executable.
+- [x] Hash the baseline cimbar executable.
+- [x] Record baseline cimbar linked libraries.
 - [ ] Capture baseline performance and peak memory.
 
-**Exit:** A second environment can reproduce the baseline.
+**Exit:** A second environment can reproduce the baseline. Initial Windows evidence is recorded in docs/security/evidence/2026-07-21-windows-mingw-baseline.md; the complete build and CTest suite are currently blocked by baseline configuration and source-compatibility defects.
 
 ## WP-02: Generate the dependency inventory and SBOM
 
 **Priority:** P0  
 **Dependencies:** WP-01
 
-- [ ] Identify exact versions of system dependencies.
-- [ ] Identify revisions of vendored libraries.
-- [ ] Record licences and local modifications.
-- [ ] Generate SPDX or CycloneDX SBOM.
+- [x] Record direct local system dependency versions in docs/security/DEPENDENCY_INVENTORY.md.
+- [ ] Identify immutable upstream revisions for every vendored library.
+- [x] Record declared licences and explicitly identify missing provenance.
+- [x] Generate an initial SPDX SBOM with deterministic vendored-source fingerprints.
 - [ ] Establish vulnerability monitoring for OpenCV, Wirehair, zstd, libcorrect, stb, and other reachable dependencies.
 
-**Exit:** Every shipped dependency has source, version, licence, and update owner.
+**Exit:** Every shipped dependency has source, version, licence, and update owner. The initial inventory is not yet release-complete because external dependencies are not locked and several vendored revisions remain unknown.
 
 ## WP-03: Establish sanitizer and static-analysis baselines
 
 **Priority:** P0  
 **Dependencies:** WP-01
 
-- [ ] Enable GitHub Actions for the fork if required.
-- [ ] Run ASan and UBSan presets.
+- [x] Enable GitHub Actions for the fork if required.
+- [x] Run ASan and UBSan presets and record the repaired baseline.
 - [ ] Attempt MemorySanitizer with compatible dependencies.
 - [ ] Run ThreadSanitizer on concurrent receiver paths.
-- [ ] Run cppcheck, clang-tidy, CodeQL, and Clang static analyzer.
-- [ ] Record findings before suppressing or fixing warnings.
+- [x] Run cppcheck against first-party sources and record the baseline.
+- [ ] Run clang-tidy, CodeQL, and Clang static analyzer.
+- [x] Record and triage cppcheck findings before fixing or suppressing warnings.
 
-**Exit:** Baseline diagnostics are triaged and new blocking findings fail CI.
+**Exit:** Baseline diagnostics are triaged and new blocking findings fail CI. Initial cppcheck evidence is recorded in docs/security/evidence/2026-07-21-cppcheck-first-party.md, and the repaired ASan/UBSan and fuzzer baseline is recorded in docs/security/evidence/2026-07-21-ci-sanitizer-alignment.md. MemorySanitizer, ThreadSanitizer, clang-tidy, CodeQL, and Clang static analyzer work remain outstanding.
 
 ## WP-04: Complete the function-level attack-surface map
 
@@ -77,11 +79,15 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 **Priority:** P0  
 **Dependencies:** WP-04, WP-05
 
-- [ ] Define `TransferPolicy` and object classes.
-- [ ] Reject object size before decoder allocation.
-- [ ] Limit active transfer count to one.
-- [ ] Limit block identifiers, unique blocks, frames, no-progress frames, duration, and memory.
-- [ ] Define deterministic cancel and reset.
+- [x] Add `FountainDecoderLimits` for object size, active streams, unique blocks, completed-transfer retention, and full-ID stream-slot binding.
+- [x] Reject object size before decoder allocation.
+- [x] Limit the default active transfer count to one.
+- [x] Bound unique-block tracking and completed-transfer retention.
+- [ ] Define `TransferPolicy` and object classes selected by the Secure Core.
+- [x] Limit block identifiers, packets per frame, frames, and no-progress frames.
+- [x] Limit transfer duration and aggregate active object bytes across streams.
+- [ ] Instrument or otherwise bound third-party codec overhead against a total decoder memory budget.
+- [x] Define deterministic cancel and reset with bounded cancellation retention.
 - [ ] Ensure completion occurs at most once.
 
 **Exit:** Optical metadata cannot enlarge Secure-Core-selected resource limits.

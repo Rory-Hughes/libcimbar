@@ -11,9 +11,9 @@ public:
 	static const unsigned _headerSize = 6;
 
 public:
-	fountain_decoder_stream(unsigned data_size, unsigned buffer_size)
+	fountain_decoder_stream(unsigned data_size, unsigned buffer_size, unsigned maximum_unique_blocks=0U)
 	    : _buffer(buffer_size, 0)
-	    , _decoder(data_size, block_size())
+	    , _decoder(data_size, block_size(), maximum_unique_blocks)
 	{
 	}
 
@@ -24,12 +24,17 @@ public:
 
 	unsigned blocks_required() const
 	{
-		return (data_size() / block_size()) + 1;
+		const unsigned payload_size = block_size();
+		if (payload_size == 0U)
+			return 0U;
+		return static_cast<unsigned>((data_size() + payload_size - 1U) / payload_size);
 	}
 
 	unsigned block_size() const
 	{
-		return _buffer.size() - _headerSize;
+		if (_buffer.size() <= _headerSize)
+			return 0U;
+		return static_cast<unsigned>(_buffer.size() - _headerSize);
 	}
 
 	size_t data_size() const
@@ -39,11 +44,14 @@ public:
 
 	bool good() const
 	{
-		return _decoder.good();
+		return block_size() > 0U && _decoder.good();
 	}
 
 	bool decode()
 	{
+		if (!good())
+			return false;
+
 		// if we're full
 		_buffIndex = 0;
 		// we ignore the first 4 bytes. It's the sink's job to make sure we're getting the right stuff.
@@ -58,6 +66,9 @@ public:
 	// 3. special case of #2, where we just roll forward every _bufferSize bytes?
 	bool write(const char* data, unsigned length)
 	{
+		if (data == nullptr || !good())
+			return false;
+
 		while (length > 0 and good())
 		{
 			unsigned writeLen = std::min(length, (unsigned)(_buffer.size() - _buffIndex));
