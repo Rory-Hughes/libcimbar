@@ -67,9 +67,9 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 
 - [x] Add initial `FountainMetadata` libFuzzer harness.
 - [ ] Seed and run the metadata corpus.
-- [ ] Design structured state-machine input operations.
-- [ ] Add start, block, duplicate, conflict, recover, cancel, timeout, and reset operations.
-- [ ] Measure peak state and memory.
+- [x] Design structured state-machine input operations.
+- [x] Add start, block, duplicate, conflict, recover, cancel, timeout, and reset operations.
+- [x] Measure peak state and memory for the bounded smoke campaign.
 - [ ] Add regression corpus entries for every defect.
 
 **Exit:** Conflicting and adversarial transfer sequences remain bounded and deterministic.
@@ -88,7 +88,7 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 - [x] Limit transfer duration and aggregate active object bytes across streams.
 - [ ] Instrument or otherwise bound third-party codec overhead against a total decoder memory budget.
 - [x] Define deterministic cancel and reset with bounded cancellation retention.
-- [ ] Ensure completion occurs at most once.
+- [x] Ensure successful completion occurs at most once per encode ID until explicit session reset.
 
 **Exit:** Optical metadata cannot enlarge Secure-Core-selected resource limits.
 

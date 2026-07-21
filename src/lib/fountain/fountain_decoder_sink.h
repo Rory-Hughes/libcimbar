@@ -9,6 +9,7 @@
 #include "serialize/format.h"
 #include "util/File.h"
 
+#include <bitset>
 #include <cstdio>
 #include <chrono>
 #include <deque>
@@ -85,6 +86,8 @@ public:
 	static constexpr int64_t frame_size_exceeds_limit = -19;
 	static constexpr int64_t transfer_duration_exceeded = -20;
 	static constexpr int64_t active_object_bytes_limit_reached = -21;
+	static constexpr int64_t transfer_already_completed = -22;
+	static constexpr std::size_t encode_id_count = 128U;
 
 	fountain_decoder_sink(
 	    unsigned chunk_size,
@@ -129,6 +132,7 @@ public:
 
 	void mark_done(const FountainMetadata& md, const std::string& filename)
 	{
+		_completedEncodeIds.set(md.encode_id());
 		if (_limits.maximum_completed_transfers > 0U)
 		{
 			auto done = _done.find(md.id());
@@ -160,6 +164,7 @@ public:
 		_doneOrder.clear();
 		_cancelled.clear();
 		_cancelledOrder.clear();
+		_completedEncodeIds.reset();
 		_activeObjectBytes = 0U;
 	}
 
@@ -205,7 +210,7 @@ public:
 
 	bool is_done(uint32_t id) const
 	{
-		return _done.find(id) != _done.end();
+		return _completedEncodeIds.test(FountainMetadata(id).encode_id());
 	}
 
 	bool is_cancelled(uint32_t id) const
@@ -249,7 +254,7 @@ public:
 
 		// check if already done
 		if (is_done(md.id()))
-			return -1;
+			return transfer_already_completed;
 
 		auto cancelled = _cancelled.find(md.id());
 		if (cancelled != _cancelled.end())
@@ -430,6 +435,8 @@ protected:
 	// Track a bounded FIFO set of completed transfer identifiers.
 	std::unordered_map<uint32_t, std::string> _done;
 	std::deque<uint32_t> _doneOrder;
+	// Exact bounded terminal history for the protocol's seven-bit encode ID.
+	std::bitset<encode_id_count> _completedEncodeIds;
 	// Retain bounded cancellation tombstones so a rejected transfer cannot restart immediately.
 	std::unordered_map<uint32_t, int64_t> _cancelled;
 	std::deque<uint32_t> _cancelledOrder;

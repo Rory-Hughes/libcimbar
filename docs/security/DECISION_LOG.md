@@ -90,6 +90,17 @@ Record significant audit and hardening decisions here. Do not silently change a 
 - **Compatibility consequences:** Existing callers continue to link. New callers receive stable negative result codes for malformed raw-frame calls.
 - **Validation required:** Unit-test null pointers, zero and excessive dimensions, unsupported formats, odd subsampled dimensions, wrong input/output lengths, and run the receive suite under ASan/UBSan.
 
+## ADR-LC-012: Make successful fountain completion terminal within a decoder session
+
+- **Status:** Accepted
+- **Context:** The detailed completed-transfer cache is intentionally bounded. Once a full metadata ID aged out, replaying the same transfer could allocate a new decoder and invoke the output callback again. The wire format has only a seven-bit encode ID and no transfer generation or nonce, so it cannot distinguish a replay from legitimate encode-ID reuse within one session.
+- **Decision:** Track all 128 encode IDs in a fixed bitset after successful recovery. Reject any later frame using a completed encode ID until `reset()` starts a new explicit decoder session. Keep the bounded full-ID map only for recent filename and status details. Expose `cimbard_reset_decode()` at the C/WASM boundary and clear transfer, recovered-output, decompressor, reporting, and debug-frame state together.
+- **Reason:** A fixed 16-byte terminal set gives an exact, non-evicting at-most-once rule without attacker-controlled growth. Requiring reset for encode-ID reuse makes the otherwise ambiguous protocol transition explicit.
+- **Alternatives considered:** Retain only recent full IDs, keep an unbounded full-ID set, or add a transfer generation to the existing wire format. Recent IDs reopen after eviction, an unbounded set violates the resource policy, and a generation field requires a new transport protocol.
+- **Security consequences:** A successfully emitted object cannot be emitted again within the same decoder session, even after its detail record is evicted. Callers must treat `reset()` as a security-relevant session boundary. Callback implementations still need transactional or non-throwing output semantics because the terminal bit is set only after the callback returns successfully.
+- **Compatibility consequences:** A sender cannot reuse an encode ID for a different object without an explicit receiver reset. Generic multi-object workflows that require reuse must use distinct sessions or a future versioned transport with a generation field.
+- **Validation required:** Unit-test replay after detail eviction, conflicting file sizes with the same encode ID, explicit sink and C-API reset, cleared recovered output, and successful re-use after reset. Assert the same property in the state-machine fuzzer.
+
 ## New decision template
 
 ### ADR-LC-NNN: Title

@@ -14,6 +14,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 using std::string;
@@ -217,13 +218,55 @@ TEST_CASE( "FountainSinkTest/testBoundsCompletedTransferCache", "[unit]" )
 	sink.mark_done(third, "third");
 
 	assertEquals( 2, sink.num_done() );
-	assertFalse( sink.is_done(first.id()) );
+	assertTrue( sink.is_done(first.id()) );
 	assertTrue( sink.is_done(second.id()) );
 	assertTrue( sink.is_done(third.id()) );
 
 	sink.reset();
 	assertEquals( 0, sink.num_done() );
 	assertEquals( 0, sink.num_streams() );
+}
+
+TEST_CASE( "FountainSinkTest/testCompletesAtMostOnceAfterDetailEviction", "[unit]" )
+{
+	FountainDecoderLimits limits;
+	limits.maximum_completed_transfers = 1;
+	std::unordered_map<std::string, unsigned> completion_counts;
+	auto on_store = [&completion_counts](const std::string& name, const std::vector<uint8_t>&)
+	{
+		++completion_counts[name];
+		return name;
+	};
+	fountain_decoder_sink sink(690, on_store, limits);
+	const string first_frame = createFrame(0, 1200);
+	const string second_frame = createFrame(1, 1600);
+	const FountainMetadata first(first_frame.data(), first_frame.size());
+	const FountainMetadata second(second_frame.data(), second_frame.size());
+
+	assertTrue( sink.write(first_frame.data(), first_frame.size()) );
+	assertTrue( sink.write(second_frame.data(), second_frame.size()) );
+	assertEquals( 1, completion_counts["0.1200"] );
+	assertEquals( 1, completion_counts["1.1600"] );
+	assertEquals( 1, sink.num_done() );
+	assertTrue( sink.is_done(first.id()) );
+	assertTrue( sink.is_done(second.id()) );
+	assertEquals(
+		fountain_decoder_sink::transfer_already_completed,
+		sink.decode_frame(first_frame.data(), first_frame.size())
+	);
+	assertEquals( 1, completion_counts["0.1200"] );
+	assertEquals( 0, sink.num_streams() );
+
+	const auto reused_encode_id = metadata_frame(0, 1201);
+	assertEquals(
+		fountain_decoder_sink::transfer_already_completed,
+		sink.decode_frame(reused_encode_id.data(), reused_encode_id.size())
+	);
+
+	sink.reset();
+	assertFalse( sink.is_done(first.id()) );
+	assertTrue( sink.write(first_frame.data(), first_frame.size()) );
+	assertEquals( 2, completion_counts["0.1200"] );
 }
 
 TEST_CASE( "FountainSinkTest/testCancelsTransferAtFrameLimit", "[unit]" )

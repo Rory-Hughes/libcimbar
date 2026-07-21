@@ -6,7 +6,7 @@ This directory contains security-focused fuzzing scaffolding for the hardened li
 
 `fuzz_fountain_metadata` exercises the six-byte fountain metadata parser and its field accessors under libFuzzer, AddressSanitizer, and UndefinedBehaviorSanitizer.
 
-`fuzz_fountain_state` drives bounded start, frame, recover, and reset operations through `fountain_decoder_sink`. It uses a 64 KiB object limit, one active stream, 128 unique blocks, and two retained completion records, so arbitrary inputs cannot trigger large decoder allocations.
+`fuzz_fountain_state` drives raw and structured frames, duplicate and conflicting blocks, recovery, no-progress cancellation, timeout, completion, replay, and reset through `fountain_decoder_sink`. It uses a 4 KiB object limit, one active stream, 64 unique blocks, four packets per frame, bounded transfer budgets, two retained completion details, and fixed terminal encode-ID tracking, so arbitrary inputs cannot trigger large decoder allocations or duplicate successful output within a session.
 
 Build locally with a recent Clang and CMake:
 

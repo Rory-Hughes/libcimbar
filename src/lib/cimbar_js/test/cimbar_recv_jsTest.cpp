@@ -53,6 +53,7 @@ namespace {
 
 TEST_CASE( "cimbar_recv_jsTest/testWirehairReassemble", "[unit]" )
 {
+	assertEquals(0, cimbard_reset_decode());
 	std::vector<unsigned char> buff;
 	buff.resize(cimbard_get_bufsize());
 
@@ -96,6 +97,7 @@ TEST_CASE( "cimbar_recv_jsTest/testWirehairReassemble", "[unit]" )
 
 TEST_CASE( "cimbar_recv_jsTest/testFullDecode", "[unit]" )
 {
+	assertEquals(0, cimbard_reset_decode());
 	std::vector<unsigned char> buff;
 	buff.resize(cimbard_get_bufsize());
 
@@ -143,6 +145,15 @@ TEST_CASE( "cimbar_recv_jsTest/testFullDecode", "[unit]" )
 
 		assertEquals( 7538, ss.str().size() ); // decompressed
 	}
+
+	// A completed encode ID is terminal inside the current session.
+	assertTrue(cimbard_fountain_decode(buff.data(), bytes) < 0);
+
+	// Reuse requires an explicit session boundary, which also clears old output.
+	assertEquals(0, cimbard_reset_decode());
+	assertTrue(cimbard_get_reassembled_file_buff() == nullptr);
+	assertTrue(cimbard_fountain_decode(buff.data(), bytes) > 0);
+	assertEquals(0, cimbard_reset_decode());
 
 }
 

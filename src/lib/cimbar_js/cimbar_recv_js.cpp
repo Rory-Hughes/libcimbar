@@ -356,6 +356,17 @@ int cimbard_get_decompress_bufsize()
 	return ZSTD_DStreamOutSize();
 }
 
+int cimbard_reset_decode()
+{
+	_sink.reset();
+	_decId = 0U;
+	_reassembled.clear();
+	_dec.reset();
+	_reporting.clear();
+	_debugFrame.release();
+	return 0;
+}
+
 int cimbard_configure_decode(int mode_val)
 {
 	// defaults
@@ -368,7 +379,7 @@ int cimbard_configure_decode(int mode_val)
 		// update config
 		_modeVal = mode_val;
 		cimbar::Config::update(mode_val);
-		_sink.reset();
+		cimbard_reset_decode();
 	}
 
 	return 0;

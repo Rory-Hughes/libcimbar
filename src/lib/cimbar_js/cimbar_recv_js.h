@@ -58,6 +58,8 @@ int cimbard_get_filename(uint32_t id, char* filename, unsigned fnsize);
 int cimbard_get_decompress_bufsize();
 int cimbard_decompress_read(uint32_t id, unsigned char* buffer, unsigned size);
 
+// Ends the current decoder session and clears transfer and recovered-output state.
+int cimbard_reset_decode(void);
 int cimbard_configure_decode(int mode_val);
 
 // testing usage only!

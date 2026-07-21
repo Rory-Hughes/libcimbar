@@ -76,6 +76,7 @@ set(LINK_WASM_EXPORTED_FUNCTIONS
 	, "_cimbard_get_filename"
 	, "_cimbard_get_decompress_bufsize"
 	, "_cimbard_decompress_read"
+	, "_cimbard_reset_decode"
 	, "_cimbard_configure_decode"
 )
 endif()

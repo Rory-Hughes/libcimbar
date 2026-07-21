@@ -3,7 +3,11 @@
 
 #include "FountainInit.h"
 #include "wirehair/wirehair.h"
+
 #include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
 
 class FountainEncoder
 {
@@ -15,7 +19,7 @@ protected:
 	}
 
 public:
-	FountainEncoder(const uint8_t* data, size_t length, size_t packet_size)
+	FountainEncoder(const std::uint8_t* data, std::size_t length, std::size_t packet_size)
 	    : _packetSize(packet_size)
 	{
 		FountainInit::init();
@@ -38,22 +42,22 @@ public:
 		return _codec != nullptr;
 	}
 
-	size_t encode(unsigned block_num, uint8_t* buff, size_t size)
+	std::size_t encode(unsigned block_num, std::uint8_t* buff, std::size_t size)
 	{
 		assert(size == _packetSize);
-		uint32_t written = 0;
+		std::uint32_t written = 0;
 		WirehairResult res = wirehair_encode(_codec, block_num, buff, size, &written);
 		if (res != Wirehair_Success)
 			return 0;
 		return written;
 	}
 
-	size_t packet_size() const
+	std::size_t packet_size() const
 	{
 		return _packetSize;
 	}
 
 protected:
 	WirehairCodec _codec;
-	size_t _packetSize;
+	std::size_t _packetSize;
 };
