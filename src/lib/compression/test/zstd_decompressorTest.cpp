@@ -10,11 +10,35 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 using std::string;
 using namespace cimbar;
 using namespace std;
+
+static_assert(!std::is_copy_constructible<File>::value, "File must not duplicate a FILE handle");
+static_assert(!std::is_copy_assignable<File>::value, "File must not duplicate a FILE handle");
+static_assert(std::is_move_constructible<File>::value, "File must transfer FILE handle ownership");
+static_assert(std::is_move_assignable<File>::value, "File must transfer FILE handle ownership");
+
+TEST_CASE( "zstd_decompressorTest/testFileMoveOwnership", "[unit]" )
+{
+	MakeTempDirectory tempdir;
+	File source(tempdir.path() / "source.txt", true);
+	File replacement(tempdir.path() / "replacement.txt", true);
+
+	REQUIRE(source.good());
+	REQUIRE(replacement.good());
+
+	File moved(std::move(source));
+	REQUIRE_FALSE(source.good());
+	REQUIRE(moved.good());
+
+	replacement = std::move(moved);
+	REQUIRE_FALSE(moved.good());
+	REQUIRE(replacement.good());
+}
 
 TEST_CASE( "zstd_decompressorTest/testDecompress.Small", "[unit]" )
 {
@@ -92,7 +116,7 @@ TEST_CASE( "zstd_decompressorTest/testDecompress.ToFile", "[unit]" )
 		assertEquals( 30, dec.decompress(ss) );
 	}
 
-	string actual = File(tempdir.path() / "decompress.txt").read_all();
+	string actual = File((tempdir.path() / "decompress.txt").string()).read_all();
 	assertEquals( expectedOutput.str(), actual );
 }
 

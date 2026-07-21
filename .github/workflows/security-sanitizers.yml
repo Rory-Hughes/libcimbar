@@ -1,0 +1,101 @@
+name: security-sanitizers
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - hardening-scaffold
+    paths:
+      - CMakeLists.txt
+      - CMakePresets.json
+      - src/**
+      - fuzz/**
+      - .github/workflows/security-sanitizers.yml
+  pull_request:
+    paths:
+      - CMakeLists.txt
+      - CMakePresets.json
+      - src/**
+      - fuzz/**
+      - .github/workflows/security-sanitizers.yml
+
+permissions:
+  contents: read
+
+jobs:
+  asan-ubsan:
+    name: ASan and UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            clang \
+            cmake \
+            ninja-build \
+            libopencv-dev \
+            libglfw3-dev \
+            libgles2-mesa-dev
+
+      - name: Configure
+        run: cmake --preset asan-ubsan
+
+      - name: Build
+        run: cmake --build --preset asan-ubsan
+
+      - name: Test
+        run: ctest --preset asan-ubsan
+
+  fuzz-smoke:
+    name: Metadata fuzzer smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install fuzzing dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang cmake ninja-build
+
+      - name: Configure fuzzer
+        run: cmake -S fuzz -B out/fuzz -G Ninja -DCMAKE_CXX_COMPILER=clang++
+
+      - name: Build fuzzer
+        run: cmake --build out/fuzz
+
+      - name: Run smoke campaign
+        env:
+          ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          mkdir -p out/fuzz-artifacts
+          ./out/fuzz/fuzz_fountain_metadata \
+            -runs=25000 \
+            -max_len=256 \
+            -timeout=5 \
+            -artifact_prefix=out/fuzz-artifacts/
+          ./out/fuzz/fuzz_fountain_state \
+            -runs=10000 \
+            -max_len=512 \
+            -rss_limit_mb=256 \
+            -timeout=5 \
+            -artifact_prefix=out/fuzz-artifacts/
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fountain-metadata-fuzz-artifacts
+          path: out/fuzz-artifacts/
+          if-no-files-found: ignore

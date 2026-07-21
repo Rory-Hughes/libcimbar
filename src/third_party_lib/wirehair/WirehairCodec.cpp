@@ -1322,10 +1322,11 @@ bool Codec::Triangle()
                         ge_column_i = pivot_i + (4 - odd_count);
                 }
 
-                uint32_t * GF256_RESTRICT word = reinterpret_cast<uint32_t*>(rem_row + ge_column_i - first_heavy_column);
+                // first_heavy_column may make this byte offset unaligned.
+                uint8_t * GF256_RESTRICT word_ptr = rem_row + ge_column_i - first_heavy_column;
 
                 // For remaining aligned columns:
-                for (; ge_column_i < column_count; ge_column_i += 4, ++word)
+                for (; ge_column_i < column_count; ge_column_i += 4, word_ptr += 4)
                 {
                     // Look up 4 bit window
                     const uint32_t bits = (uint32_t)(pivot_row[ge_column_i >> 6] >> (ge_column_i & 63)) & 15;
@@ -1337,7 +1338,10 @@ bool Codec::Triangle()
 
                     CAT_IF_DUMP(cout << " " << ge_column_i << "x" << hex << setw(8) << setfill('0') << window << dec;)
 
-                    *word ^= window * code_value;
+                    uint32_t word;
+                    memcpy(&word, word_ptr, sizeof(word));
+                    word ^= window * code_value;
+                    memcpy(word_ptr, &word, sizeof(word));
                 }
 #endif // CAT_HEAVY_WIN_MULT
                 CAT_IF_DUMP(cout << endl;)
@@ -3747,12 +3751,15 @@ bool Codec::AllocateWorkspace()
     const unsigned recovery_rows = _block_count + _mix_count + 1;
     const uint64_t recoverySizeBytes = static_cast<uint64_t>(recovery_rows) * _block_bytes;
 
+    // Block data can have any byte length, so align the following peel structures.
+    const uint64_t peelOffsetBytes = (recoverySizeBytes + 7) & ~UINT64_C(7);
+
     // Count needed rows and columns
     const uint32_t row_count = _block_count + _extra_count;
     const uint32_t column_count = _block_count;
 
     // Calculate size
-    const uint64_t sizeBytes = recoverySizeBytes
+    const uint64_t sizeBytes = peelOffsetBytes
         + sizeof(PeelRow) * row_count
         + sizeof(PeelColumn) * column_count
         + sizeof(PeelRefs) * column_count
@@ -3771,7 +3778,7 @@ bool Codec::AllocateWorkspace()
     }
 
     // Set pointers
-    _peel_rows = reinterpret_cast<PeelRow *>( _recovery_blocks + recoverySizeBytes );
+    _peel_rows = reinterpret_cast<PeelRow *>( _recovery_blocks + peelOffsetBytes );
     _peel_cols = reinterpret_cast<PeelColumn *>( _peel_rows + row_count );
     _peel_col_refs = reinterpret_cast<PeelRefs *>( _peel_cols + column_count );
     _copied_original = reinterpret_cast<uint8_t *>( _peel_col_refs + column_count );

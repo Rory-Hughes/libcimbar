@@ -13,7 +13,7 @@ TEST_CASE( "ExtractorTest/testExtract", "[unit]" )
 {
 	MakeTempDirectory tempdir;
 
-	std::string imgPath = tempdir.path() / "ex.jpg";
+	std::string imgPath = (tempdir.path() / "ex.jpg").string();
 	ExtractorPlus ext(0, {1024, 1024}, 30);
 	ext.extract(TestCimbar::getSample("6bit/4_30_f0_big.jpg"), imgPath);
 
@@ -26,7 +26,7 @@ TEST_CASE( "ExtractorTest/testExtractMid", "[unit]" )
 {
 	MakeTempDirectory tempdir;
 
-	std::string imgPath = tempdir.path() / "ex.jpg";
+	std::string imgPath = (tempdir.path() / "ex.jpg").string();
 	ExtractorPlus ext(0, {1024, 1024}, 30);
 	ext.extract(TestCimbar::getSample("6bit/4_30_f2_734.jpg"), imgPath);
 
@@ -39,7 +39,7 @@ TEST_CASE( "ExtractorTest/testExtractUpscale", "[unit]" )
 {
 	MakeTempDirectory tempdir;
 
-	std::string imgPath = tempdir.path() / "exup.jpg";
+	std::string imgPath = (tempdir.path() / "exup.jpg").string();
 	ExtractorPlus ext(0, {1024, 1024}, 30);
 	ext.extract(TestCimbar::getSample("6bit/4_30_f0_627.jpg"), imgPath);
 

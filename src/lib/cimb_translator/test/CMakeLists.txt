@@ -12,6 +12,7 @@ set (SOURCES
 	CimbEncoderTest.cpp
 	CimbReaderTest.cpp
 	CimbWriterTest.cpp
+	CommonTest.cpp
 	FloodDecodePositionsTest.cpp
 	InterleaveTest.cpp
 	LinearDecodePositionsTest.cpp

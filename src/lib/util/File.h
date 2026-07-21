@@ -17,8 +17,34 @@ public:
 
 public:
 	File(std::string filename, bool write=false)
+		: _fp(nullptr)
 	{
 		_fp = fopen(filename.c_str(), write? "wb" : "rb");
+	}
+
+	File(const std::filesystem::path& filename, bool write=false)
+		: File(filename.string(), write)
+	{
+	}
+
+	File(const File&) = delete;
+	File& operator=(const File&) = delete;
+
+	File(File&& other) noexcept
+		: _fp(other._fp)
+	{
+		other._fp = nullptr;
+	}
+
+	File& operator=(File&& other) noexcept
+	{
+		if (this != &other)
+		{
+			close();
+			_fp = other._fp;
+			other._fp = nullptr;
+		}
+		return *this;
 	}
 
 	std::string read_all()

@@ -52,6 +52,20 @@ if(NOT DEFINED OPENCV_LIBS)
 	set(OPENCV_LIBS "opencv_calib3d" "opencv_imgcodecs" "opencv_imgproc" "opencv_photo" "opencv_core" ${OPENCV4_STATIC_LIBRARIES})
 endif()
 
+if(WIN32)
+	find_package(glfw3 CONFIG REQUIRED)
+
+	find_path(OPENGL_REGISTRY_INCLUDE_DIRS "GLES3/gl3.h")
+	if(OPENGL_REGISTRY_INCLUDE_DIRS)
+		include_directories(${OPENGL_REGISTRY_INCLUDE_DIRS})
+	endif()
+
+	if(NOT TARGET GL)
+		add_library(GL INTERFACE IMPORTED)
+		set_property(TARGET GL PROPERTY INTERFACE_LINK_LIBRARIES opengl32)
+	endif()
+endif()
+
 if(NOT DEFINED CPPFILESYSTEM)
 	set(CPPFILESYSTEM "stdc++fs")
 endif()
@@ -83,17 +97,31 @@ set (PROJECTS
 	src/third_party_lib/zstd
 )
 
+if(WIN32)
+	set(LIBCIMBAR_BUILD_GUI_TOOLS_DEFAULT OFF)
+else()
+	set(LIBCIMBAR_BUILD_GUI_TOOLS_DEFAULT ON)
+endif()
+option(LIBCIMBAR_BUILD_GUI_TOOLS "Build OpenGL/GLFW live send and receive tools" ${LIBCIMBAR_BUILD_GUI_TOOLS_DEFAULT})
+
 if(NOT DEFINED USE_WASM)
 set(PROJECTS
 	${PROJECTS}
 
 	src/exe/cimbar
 	src/exe/cimbar_extract
+	src/exe/build_image_assets
+)
+
+if(LIBCIMBAR_BUILD_GUI_TOOLS)
+set(PROJECTS
+	${PROJECTS}
+
 	src/exe/cimbar_recv
 	src/exe/cimbar_recv2
 	src/exe/cimbar_send
-	src/exe/build_image_assets
 )
+endif()
 endif()
 
 include_directories(

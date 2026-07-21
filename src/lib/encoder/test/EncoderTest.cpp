@@ -24,7 +24,7 @@ TEST_CASE( "EncoderTest/testVanilla", "[unit]" )
 	cs.active_conf().ecc_bytes = 40;
 
 	std::string inputFile = TestCimbar::getProjectDir() + "/LICENSE";
-	std::string outPrefix = tempdir.path() / "encoder.vanilla";
+	std::string outPrefix = (tempdir.path() / "encoder.vanilla").string();
 
 	EncoderPlus enc(4, 2);
 	assertEquals( 3, enc.encode(inputFile, outPrefix) );
@@ -48,7 +48,7 @@ TEST_CASE( "EncoderTest/testFountain.4c", "[unit]" )
 	cs.active_conf().ecc_bytes = 40;
 
 	std::string inputFile = TestCimbar::getProjectDir() + "/LICENSE";
-	std::string outPrefix = tempdir.path() / "encoder.fountain";
+	std::string outPrefix = (tempdir.path() / "encoder.fountain").string();
 
 	EncoderPlus enc(4, 2);
 	assertEquals( 3, enc.encode_fountain(inputFile, outPrefix, 0) );
@@ -72,7 +72,7 @@ TEST_CASE( "EncoderTest/testFountain.B", "[unit]" )
 	cs.active_conf().ecc_bytes = 40;
 
 	std::string inputFile = TestCimbar::getProjectDir() + "/LICENSE";
-	std::string outPrefix = tempdir.path() / "encoder.fountain";
+	std::string outPrefix = (tempdir.path() / "encoder.fountain").string();
 
 	EncoderPlus enc(4, 2);
 	assertEquals( 4, enc.encode_fountain(inputFile, outPrefix, 0) );
@@ -94,7 +94,7 @@ TEST_CASE( "EncoderTest/testFountain.Compress", "[unit]" )
 	MakeTempDirectory tempdir;
 
 	std::string inputFile = TestCimbar::getProjectDir() + "/LICENSE";
-	std::string outPrefix = tempdir.path() / "encoder.fountain";
+	std::string outPrefix = (tempdir.path() / "encoder.fountain").string();
 
 	EncoderPlus enc(4, 2);
 	assertEquals( 1, enc.encode_fountain(inputFile, outPrefix) );
@@ -138,7 +138,7 @@ TEST_CASE( "EncoderTest/testFountain.Size", "[unit]" )
 	MakeTempDirectory tempdir;
 
 	std::string inputFile = TestCimbar::getProjectDir() + "/LICENSE";
-	std::string outPrefix = tempdir.path() / "encoder.fountain";
+	std::string outPrefix = (tempdir.path() / "encoder.fountain").string();
 
 	EncoderPlus enc(4, 2);
 	assertEquals( 1, enc.encode_fountain(inputFile, outPrefix, 16, 1.6) );

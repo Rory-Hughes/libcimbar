@@ -1,0 +1,9 @@
+# Initial ownership for the audit and hardening fork.
+* @Rory-Hughes
+
+# Security architecture and audit records require explicit owner review.
+/docs/security/ @Rory-Hughes
+/SECURITY.md @Rory-Hughes
+/fuzz/ @Rory-Hughes
+/.github/workflows/security-* @Rory-Hughes
+/CMakePresets.json @Rory-Hughes

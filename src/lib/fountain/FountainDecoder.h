@@ -3,9 +3,9 @@
 
 #include "FountainInit.h"
 #include "wirehair/wirehair.h"
-#include <array>
 #include <optional>
 #include <set>
+#include <utility>
 #include <vector>
 
 // will need to split large files
@@ -13,11 +13,42 @@
 class FountainDecoder
 {
 public:
-	FountainDecoder(size_t length, size_t packet_size)
+	FountainDecoder(size_t length, size_t packet_size, unsigned maximum_unique_blocks=0U)
 	    : _length(length)
+	    , _packetSize(packet_size)
+	    , _maximumUniqueBlocks(maximum_unique_blocks)
 	{
 		FountainInit::init();
-		_codec = wirehair_decoder_create(nullptr, length, packet_size);
+		if (_length > 0U && _packetSize > 0U)
+			_codec = wirehair_decoder_create(nullptr, _length, _packetSize);
+	}
+
+	FountainDecoder(const FountainDecoder&) = delete;
+	FountainDecoder& operator=(const FountainDecoder&) = delete;
+
+	FountainDecoder(FountainDecoder&& other) noexcept
+	    : _codec(std::exchange(other._codec, nullptr))
+	    , _res(other._res)
+	    , _length(other._length)
+	    , _packetSize(other._packetSize)
+	    , _maximumUniqueBlocks(other._maximumUniqueBlocks)
+	    , _seenBlocks(std::move(other._seenBlocks))
+	{
+	}
+
+	FountainDecoder& operator=(FountainDecoder&& other) noexcept
+	{
+		if (this != &other)
+		{
+			wirehair_free(_codec);
+			_codec = std::exchange(other._codec, nullptr);
+			_res = other._res;
+			_length = other._length;
+			_packetSize = other._packetSize;
+			_maximumUniqueBlocks = other._maximumUniqueBlocks;
+			_seenBlocks = std::move(other._seenBlocks);
+		}
+		return *this;
 	}
 
 	~FountainDecoder()
@@ -47,6 +78,18 @@ public:
 
 	bool decode(unsigned block_num, uint8_t* data, size_t length)
 	{
+		if (!good() || data == nullptr || length == 0U || length > _packetSize)
+		{
+			_res = Wirehair_InvalidInput;
+			return false;
+		}
+
+		if (_maximumUniqueBlocks > 0U && _seenBlocks.size() >= _maximumUniqueBlocks)
+		{
+			_res = Wirehair_InvalidInput;
+			return false;
+		}
+
 		auto pear = _seenBlocks.insert(block_num);
 		if (!pear.second)
 			return false;
@@ -61,6 +104,12 @@ public:
 
 	bool recover(unsigned char* data, unsigned size)
 	{
+		if (!good() || data == nullptr || size != _length)
+		{
+			_res = Wirehair_InvalidInput;
+			return false;
+		}
+
 		_res = wirehair_recover(_codec, data, size);
 		return _res == Wirehair_Success;
 	}
@@ -76,8 +125,10 @@ public:
 	}
 
 protected:
-	WirehairCodec _codec;
-	WirehairResult _res;
+	WirehairCodec _codec = nullptr;
+	WirehairResult _res = Wirehair_InvalidInput;
 	size_t _length;
+	size_t _packetSize;
+	unsigned _maximumUniqueBlocks;
 	std::set<unsigned> _seenBlocks; // giving wirehair_decode the same block too many times can make it very, very upset
 };

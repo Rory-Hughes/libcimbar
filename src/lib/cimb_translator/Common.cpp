@@ -8,7 +8,9 @@
 #include "stb/stb_image.h"
 #include <opencv2/opencv.hpp>
 
+#include <limits>
 #include <map>
+#include <memory>
 #include <string>
 #include "bitmaps.h"
 
@@ -98,6 +100,58 @@ namespace {
 
 namespace cimbar {
 
+namespace detail {
+
+cv::Mat decode_image(const uint8_t* data, std::size_t size)
+{
+	static constexpr int maximum_dimension = 4096;
+	static constexpr std::size_t maximum_pixels = 16U * 1024U * 1024U;
+	static constexpr int output_channels = STBI_rgb_alpha;
+
+	if (data == nullptr || size == 0U ||
+	    size > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+		return cv::Mat();
+
+	int width = 0;
+	int height = 0;
+	int source_channels = 0;
+	const int encoded_size = static_cast<int>(size);
+	if (!stbi_info_from_memory(data, encoded_size, &width, &height, &source_channels) ||
+	    width <= 0 || height <= 0 ||
+	    width > maximum_dimension || height > maximum_dimension ||
+	    source_channels <= 0 || source_channels > STBI_rgb_alpha)
+		return cv::Mat();
+
+	const std::size_t pixel_count =
+	    static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+	if (pixel_count > maximum_pixels)
+		return cv::Mat();
+
+	using stbi_image_ptr = std::unique_ptr<stbi_uc, decltype(&stbi_image_free)>;
+	stbi_image_ptr imgdata(
+	    stbi_load_from_memory(
+	        data,
+	        encoded_size,
+	        &width,
+	        &height,
+	        &source_channels,
+	        output_channels
+	    ),
+	    stbi_image_free
+	);
+	if (!imgdata ||
+	    width <= 0 || height <= 0 ||
+	    width > maximum_dimension || height > maximum_dimension)
+		return cv::Mat();
+
+	cv::Mat rgba(height, width, CV_8UC4, imgdata.get());
+	cv::Mat rgb;
+	cv::cvtColor(rgba, rgb, cv::COLOR_RGBA2RGB);
+	return rgb;
+}
+
+}
+
 cv::Mat load_img(string path)
 {
 	auto it = cimbar::bitmaps.find(path);
@@ -106,17 +160,7 @@ cv::Mat load_img(string path)
 
 	string bytes = base91::decode(it->second);
 	vector<unsigned char> data(bytes.data(), bytes.data() + bytes.size());
-
-	int width, height, channels;
-	std::unique_ptr<uint8_t[], void (*)(void*)> imgdata(stbi_load_from_memory(data.data(), static_cast<int>(data.size()), &width, &height, &channels, STBI_rgb_alpha), ::free);
-	if (!imgdata)
-		return cv::Mat();
-
-	size_t len = width * height * channels;
-	cv::Mat mat(height, width, CV_MAKETYPE(CV_8U, channels));
-	std::copy(imgdata.get(), imgdata.get()+len, mat.data);
-	cv::cvtColor(mat, mat, cv::COLOR_RGBA2RGB);
-	return mat;
+	return detail::decode_image(data.data(), data.size());
 }
 
 RGB getColor(unsigned index, unsigned num_colors, unsigned color_mode)
