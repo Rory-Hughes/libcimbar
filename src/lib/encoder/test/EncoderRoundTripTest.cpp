@@ -6,7 +6,7 @@
 #include "encoder/EncoderPlus.h"
 
 #include "compression/zstd_decompressor.h"
-#include "fountain/fountain_decoder_sink.h"
+#include "fountain/fountain_decoder_file_sink.h"
 #include "image_hash/average_hash.h"
 #include "serialize/format.h"
 #include "util/ConfigScope.h"

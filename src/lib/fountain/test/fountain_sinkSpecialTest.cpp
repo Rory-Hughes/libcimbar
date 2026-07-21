@@ -3,7 +3,7 @@
 
 #include "FountainMetadata.h"
 #include "fountain_encoder_stream.h"
-#include "fountain_decoder_sink.h"
+#include "fountain_decoder_file_sink.h"
 
 #include "serialize/format.h"
 #include "util/File.h"
@@ -91,7 +91,10 @@ TEST_CASE( "FountainSinkSpecialTest/testMultipart", "[unit]" )
 			}
 			else // i > expectedBlocks, we're already done
 			{
-				assertMsg(res == -1, fmt::format("failed {}, res {}", i, res));
+				assertMsg(
+					res == fountain_decoder_sink::transfer_already_completed,
+					fmt::format("failed {}, res {}", i, res)
+				);
 				assertMsg( sink.is_done(md.id()), fmt::format("failed {}, should be done", i) );
 			}
 		}

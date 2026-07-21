@@ -3,9 +3,9 @@
     "dataLicense":  "CC0-1.0",
     "SPDXID":  "SPDXRef-DOCUMENT",
     "name":  "libcimbar direct dependency inventory",
-    "documentNamespace":  "https://github.com/Rory-Hughes/libcimbar/spdx/fcbf621db65d25bdf2fe369d96400da24b2f9292",
+    "documentNamespace":  "https://github.com/Rory-Hughes/libcimbar/spdx/390b99213baaff2bd95a801f22fc29067b0fbba3",
     "creationInfo":  {
-                         "created":  "2026-07-21T14:50:59Z",
+                         "created":  "2026-07-21T20:14:21Z",
                          "creators":  [
                                           "Tool: scripts/generate-sbom.ps1"
                                       ],
@@ -18,14 +18,14 @@
                      {
                          "SPDXID":  "SPDXRef-libcimbar",
                          "name":  "libcimbar",
-                         "versionInfo":  "fcbf621db65d25bdf2fe369d96400da24b2f9292",
-                         "downloadLocation":  "git+https://github.com/Rory-Hughes/libcimbar@fcbf621db65d25bdf2fe369d96400da24b2f9292",
+                         "versionInfo":  "390b99213baaff2bd95a801f22fc29067b0fbba3",
+                         "downloadLocation":  "git+https://github.com/Rory-Hughes/libcimbar@390b99213baaff2bd95a801f22fc29067b0fbba3",
                          "filesAnalyzed":  false,
                          "licenseConcluded":  "MPL-2.0",
                          "licenseDeclared":  "MPL-2.0",
                          "copyrightText":  "NOASSERTION",
                          "primaryPackagePurpose":  "APPLICATION",
-                         "sourceInfo":  "Repository HEAD fcbf621db65d25bdf2fe369d96400da24b2f9292 with a dirty worktree at SBOM generation time.",
+                         "sourceInfo":  "Repository HEAD 390b99213baaff2bd95a801f22fc29067b0fbba3 with a dirty worktree at SBOM generation time.",
                          "comment":  "This SBOM covers the direct source and build dependencies documented in docs/security/DEPENDENCY_INVENTORY.md."
                      },
                      {

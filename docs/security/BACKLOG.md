@@ -51,14 +51,14 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 **Priority:** P0  
 **Dependencies:** WP-01
 
-- [ ] Map raw frame to geometry extraction.
-- [ ] Map symbol extraction to ECC.
-- [ ] Map corrected payload to metadata.
-- [ ] Map fountain state and Wirehair calls.
-- [ ] Map optional decompression and output.
-- [ ] Record ownership, bounds, allocation, state, and failure behaviour for each transition.
+- [x] Map raw frame to geometry extraction.
+- [x] Map symbol extraction to ECC.
+- [x] Map corrected payload to metadata.
+- [x] Map fountain state and Wirehair calls.
+- [x] Map optional decompression and output.
+- [x] Record ownership, bounds, allocation, state, and failure behaviour for each transition.
 
-**Exit:** Every hostile-input-reachable function has a review status.
+**Exit:** Every hostile-input transition has a function-level review status in docs/security/ATTACK_SURFACE.md. Open controls are tracked in the owning work packages rather than treated as completed remediation.
 
 ## WP-05: Fountain metadata and state-machine fuzzing
 
@@ -67,9 +67,9 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 
 - [x] Add initial `FountainMetadata` libFuzzer harness.
 - [ ] Seed and run the metadata corpus.
-- [ ] Design structured state-machine input operations.
-- [ ] Add start, block, duplicate, conflict, recover, cancel, timeout, and reset operations.
-- [ ] Measure peak state and memory.
+- [x] Design structured state-machine input operations.
+- [x] Add start, block, duplicate, conflict, recover, cancel, timeout, and reset operations.
+- [x] Measure peak state and memory for the bounded smoke campaign.
 - [ ] Add regression corpus entries for every defect.
 
 **Exit:** Conflicting and adversarial transfer sequences remain bounded and deterministic.
@@ -83,12 +83,12 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 - [x] Reject object size before decoder allocation.
 - [x] Limit the default active transfer count to one.
 - [x] Bound unique-block tracking and completed-transfer retention.
-- [ ] Define `TransferPolicy` and object classes selected by the Secure Core.
-- [x] Limit block identifiers, packets per frame, frames, and no-progress frames.
+- [x] Define the fountain-stage `FountainTransferPolicy` and object classes selected by the Secure Core.
+- [x] Validate every packet in a frame and limit block identifiers, packets per frame, frames, and no-progress frames.
 - [x] Limit transfer duration and aggregate active object bytes across streams.
 - [ ] Instrument or otherwise bound third-party codec overhead against a total decoder memory budget.
 - [x] Define deterministic cancel and reset with bounded cancellation retention.
-- [ ] Ensure completion occurs at most once.
+- [x] Ensure successful completion occurs at most once per encode ID until explicit session reset.
 
 **Exit:** Optical metadata cannot enlarge Secure-Core-selected resource limits.
 
@@ -97,10 +97,10 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 **Priority:** P0  
 **Dependencies:** WP-06
 
-- [ ] Design `DecoderSession` API.
-- [ ] Return exact-length opaque bytes only.
-- [ ] Remove filename, MIME, path, and application-route semantics.
-- [ ] Ensure partial objects never cross the API.
+- [x] Add a policy-required fountain-stage decoder session API.
+- [x] Return exact-length opaque bytes through a single-take ownership transfer.
+- [x] Keep filename, MIME, path, callback, and application-route semantics out of the restricted API; isolate generic filesystem helpers in a compatibility header.
+- [x] Ensure partial objects never cross the restricted API.
 - [ ] Test allocation failure and output refusal.
 
 **Exit:** The decoder has no generic file or application action interface.

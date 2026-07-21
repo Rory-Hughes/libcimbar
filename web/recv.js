@@ -13,6 +13,10 @@ var Sink = function () {
 
   // public interface
   return {
+    reset: function () {
+      return Module._cimbard_reset_decode();
+    },
+
     allocate: function () {
       const size = Module._cimbard_get_bufsize(); // max length of buff. We could also resize as we go...
       if (_fountainBuff && size > _fountainBuff.length) {

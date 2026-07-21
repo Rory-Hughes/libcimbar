@@ -7,7 +7,7 @@
 #include "extractor/SimpleCameraCalibration.h"
 #include "extractor/Undistort.h"
 #include "fountain/FountainInit.h"
-#include "fountain/fountain_decoder_sink.h"
+#include "fountain/fountain_decoder_file_sink.h"
 #include "serialize/str.h"
 
 #include "cxxopts/cxxopts.hpp"

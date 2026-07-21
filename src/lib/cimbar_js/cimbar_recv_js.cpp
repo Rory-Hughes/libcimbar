@@ -2,11 +2,13 @@
 #include "cimbar_recv_js.h"
 
 #include "cimb_translator/Config.h"
+#include "compression/zstd_decompressor.h"
 #include "compression/zstd_header_check.h"
 #include "encoder/Decoder.h"
 #include "encoder/escrow_buffer_writer.h"
 #include "extractor/Extractor.h"
 #include "fountain/fountain_decoder_sink.h"
+#include "serialize/format.h"
 #include "serialize/str_join.h"
 #include "util/File.h"
 #include "util/Timer.h"
@@ -14,7 +16,9 @@
 #include <opencv2/opencv.hpp>
 
 #include <algorithm>
+#include <exception>
 #include <filesystem>
+#include <limits>
 #include <memory>
 
 
@@ -37,6 +41,44 @@ namespace {
 	// settings
 	int _modeVal = 68;
 
+	constexpr uint64_t maximum_frame_pixels = CIMBARD_MAX_FRAME_PIXELS;
+
+	int expected_frame_size(unsigned width, unsigned height, int format, size_t& size)
+	{
+		if (width == 0U || height == 0U)
+			return CIMBARD_SCAN_INVALID_DIMENSIONS;
+
+		const uint64_t pixels = static_cast<uint64_t>(width) * height;
+		if (width > static_cast<unsigned>(std::numeric_limits<int>::max()) ||
+		    height > static_cast<unsigned>(std::numeric_limits<int>::max()) ||
+		    pixels > maximum_frame_pixels)
+			return CIMBARD_SCAN_FRAME_TOO_LARGE;
+
+		uint64_t bytes = 0U;
+		switch (format)
+		{
+			case CIMBARD_PIXEL_FORMAT_RGB:
+				bytes = pixels * 3U;
+				break;
+			case CIMBARD_PIXEL_FORMAT_RGBA:
+				bytes = pixels * 4U;
+				break;
+			case CIMBARD_PIXEL_FORMAT_NV12:
+			case CIMBARD_PIXEL_FORMAT_I420:
+				if ((width & 1U) != 0U || (height & 1U) != 0U)
+					return CIMBARD_SCAN_INVALID_BUFFER_SIZE;
+				bytes = pixels + pixels / 2U;
+				break;
+			default:
+				return CIMBARD_SCAN_UNSUPPORTED_FORMAT;
+		}
+
+		if (bytes > std::numeric_limits<size_t>::max())
+			return CIMBARD_SCAN_FRAME_TOO_LARGE;
+		size = static_cast<size_t>(bytes);
+		return 0;
+	}
+
 	// set up stateful decompressor
 	// for api simplicity, this is coupled to recover_contents()
 	// ... but we *could* split them up
@@ -49,7 +91,11 @@ namespace {
 		_dec = std::make_unique<cimbar::zstd_decompressor<std::stringstream>>();
 		if (!_dec)
 			return -12;
-		_dec->init_decompress(reinterpret_cast<char*>(_reassembled.data()), _reassembled.size());
+		if (!_dec->init_decompress(reinterpret_cast<char*>(_reassembled.data()), _reassembled.size()))
+		{
+			_dec.reset();
+			return -13;
+		}
 		return 0;
 	}
 
@@ -91,20 +137,20 @@ namespace {
 		return cimbar::Config::fountain_chunk_size();
 	}
 
-	cv::UMat get_rgb(void* imgdata, int width, int height, int type)
+	cv::UMat get_rgb(const void* imgdata, int width, int height, int type)
 	{
 		cv::UMat img;
 		switch (type)
 		{
-			case 12:
+			case CIMBARD_PIXEL_FORMAT_NV12:
 			{
-				img = cv::Mat(height * 3/2, width, CV_8UC1, imgdata).getUMat(cv::ACCESS_RW).clone();
+				img = cv::Mat(height + height / 2, width, CV_8UC1, const_cast<void*>(imgdata)).getUMat(cv::ACCESS_RW).clone();
 				cv::cvtColor(img, img, cv::COLOR_YUV2RGB_NV12); // 12 or 21 :hmm:
 				return img;
 			}
-			case 420:
+			case CIMBARD_PIXEL_FORMAT_I420:
 			{
-				img = cv::Mat(height * 3/2, width, CV_8UC1, imgdata).getUMat(cv::ACCESS_RW).clone();
+				img = cv::Mat(height + height / 2, width, CV_8UC1, const_cast<void*>(imgdata)).getUMat(cv::ACCESS_RW).clone();
 				cv::cvtColor(img, img, cv::COLOR_YUV420p2RGB);
 				return img;
 			}
@@ -112,9 +158,9 @@ namespace {
 				break;
 		}
 
-		int cvtype = type==4? CV_8UC4 : CV_8UC3;
-		img = cv::Mat(height, width, cvtype, imgdata).getUMat(cv::ACCESS_RW).clone();
-		if (type == 4)
+		int cvtype = type == CIMBARD_PIXEL_FORMAT_RGBA ? CV_8UC4 : CV_8UC3;
+		img = cv::Mat(height, width, cvtype, const_cast<void*>(imgdata)).getUMat(cv::ACCESS_RW).clone();
+		if (type == CIMBARD_PIXEL_FORMAT_RGBA)
 			cv::cvtColor(img, img, cv::COLOR_RGBA2RGB);
 		return img;
 	}
@@ -124,6 +170,8 @@ extern "C" {
 
 unsigned cimbard_get_report(uchar* buff, unsigned maxlen)
 {
+	if (buff == nullptr || maxlen == 0U)
+		return 0U;
 	int len = std::min<unsigned>(_reporting.size(), maxlen);
 	if (len == 0)
 		return 0;
@@ -133,8 +181,11 @@ unsigned cimbard_get_report(uchar* buff, unsigned maxlen)
 
 unsigned cimbard_get_debug(uchar* buff, unsigned maxlen)
 {
-	int len = std::min<unsigned>(_debugFrame.dims*_debugFrame.cols*_debugFrame.rows, maxlen);
-	if (len == 0)
+	if (buff == nullptr || maxlen == 0U || _debugFrame.data == nullptr)
+		return 0U;
+	const size_t available = _debugFrame.total() * _debugFrame.elemSize();
+	const unsigned len = static_cast<unsigned>(std::min<size_t>(available, maxlen));
+	if (len == 0U)
 		return 0;
 	std::copy(_debugFrame.data, _debugFrame.data+len, buff);
 	return len;
@@ -145,58 +196,92 @@ int cimbard_get_bufsize()
 	return fountain_chunks_per_frame() * fountain_chunk_size();
 }
 
-int cimbard_scan_extract_decode(const uchar* imgdata, unsigned imgw, unsigned imgh, int format, uchar* bufspace, unsigned bufsize)
+int cimbard_scan_extract_decode_checked(const uchar* imgdata, size_t imgsize, unsigned imgw, unsigned imgh, int format, uchar* bufspace, unsigned bufsize)
 {
 	if (format <= 0)
-		format = 3;
-	if (imgw == 0 or imgh == 0)
-		return -1;
+		format = CIMBARD_PIXEL_FORMAT_RGB;
+
+	size_t expected_size = 0U;
+	const int frame_result = expected_frame_size(imgw, imgh, format, expected_size);
+	if (frame_result < 0)
+		return frame_result;
+	if (imgdata == nullptr || bufspace == nullptr)
+		return CIMBARD_SCAN_NULL_POINTER;
+	if (imgsize != expected_size)
+		return CIMBARD_SCAN_INVALID_BUFFER_SIZE;
 
 	unsigned chunksPerFrame = fountain_chunks_per_frame();
 	unsigned chunkSize = fountain_chunk_size();
 	// early bail if bufsize doesn't match config params (fountain chunk size * count)
-	if (bufsize < chunkSize * chunksPerFrame)
-		return -2;
+	const uint64_t required_output_size = static_cast<uint64_t>(chunkSize) * chunksPerFrame;
+	if (chunkSize == 0U || chunksPerFrame == 0U || required_output_size > bufsize)
+		return CIMBARD_SCAN_OUTPUT_BUFFER_TOO_SMALL;
 
-	// interface to take the aligned output buffers of chunkSize and dump them into bufspace
-	escrow_buffer_writer ebw(bufspace, chunksPerFrame, chunkSize);
-	Extractor ext;
-	Decoder dec;
-
-	cv::UMat img = get_rgb((void*)imgdata, imgw, imgh, format);
-	_debugFrame = img.getMat(cv::ACCESS_READ).clone();
-
-	_reporting = fmt::format("sce: {}, imgdec: {}", _tScanExtract.avg(), _tImgDecode.avg());
-
-	bool shouldPreprocess = true;
+	try
 	{
-		Timer t(_tScanExtract);
-		int res = ext.extract(img, img);
-		if (!res)
-			return -3;
-		else if (res == Extractor::NEEDS_SHARPEN)
-			shouldPreprocess = true;
-	}
+		// interface to take the aligned output buffers of chunkSize and dump them into bufspace
+		escrow_buffer_writer ebw(bufspace, chunksPerFrame, chunkSize);
+		Extractor ext;
+		Decoder dec;
 
-	// decode
-	int bytes = 0;
-	{
-		Timer t(_tImgDecode);
-		dec.decode_fountain(img, ebw, shouldPreprocess);
+		cv::UMat img = get_rgb(imgdata, static_cast<int>(imgw), static_cast<int>(imgh), format);
+		_debugFrame = img.getMat(cv::ACCESS_READ).clone();
+
+		_reporting = fmt::format("sce: {}, imgdec: {}", _tScanExtract.avg(), _tImgDecode.avg());
+
+		bool shouldPreprocess = true;
+		{
+			Timer t(_tScanExtract);
+			int res = ext.extract(img, img);
+			if (!res)
+				return CIMBARD_SCAN_EXTRACT_FAILED;
+			else if (res == Extractor::NEEDS_SHARPEN)
+				shouldPreprocess = true;
+		}
+
+		{
+			Timer t(_tImgDecode);
+			dec.decode_fountain(img, ebw, shouldPreprocess);
+		}
+		_reporting = fmt::format("sce: {}, imgdec: {}, decoded {} bytes", _tScanExtract.avg(), _tImgDecode.avg(), ebw.buffers_in_use() * chunkSize);
+		return ebw.buffers_in_use() * chunkSize;
 	}
-	_reporting = fmt::format("sce: {}, imgdec: {}, decoded {} bytes!!! {}", _tScanExtract.avg(), _tImgDecode.avg(), bytes, ebw.buffers_in_use() * chunkSize);
-	return ebw.buffers_in_use() * chunkSize;
+	catch (const cv::Exception& error)
+	{
+		_reporting = fmt::format("OpenCV frame processing error: {}", error.what());
+	}
+	catch (const std::exception& error)
+	{
+		_reporting = fmt::format("frame processing error: {}", error.what());
+	}
+	catch (...)
+	{
+		_reporting = "unknown frame processing error";
+	}
+	return CIMBARD_SCAN_PROCESSING_ERROR;
+}
+
+int cimbard_scan_extract_decode(const uchar* imgdata, unsigned imgw, unsigned imgh, int format, uchar* bufspace, unsigned bufsize)
+{
+	if (format <= 0)
+		format = CIMBARD_PIXEL_FORMAT_RGB;
+	size_t expected_size = 0U;
+	const int frame_result = expected_frame_size(imgw, imgh, format, expected_size);
+	if (frame_result < 0)
+		return frame_result;
+	return cimbard_scan_extract_decode_checked(imgdata, expected_size, imgw, imgh, format, bufspace, bufsize);
 }
 
 // returns id of final file (can be used to get size of `finish_copy`'s buffer) if complete, 0 if success, -1 on error
 int64_t cimbard_fountain_decode(const unsigned char* buffer, unsigned size)
 {
 	unsigned chunkSize = fountain_chunk_size();
-	if (!_sink) // lazy-create the sink on first run
-		_sink = std::make_shared<fountain_decoder_sink>(chunkSize);
-
-	if (size == 0 or size % chunkSize != 0)
+	if (chunkSize == 0U || size == 0U || size % chunkSize != 0U)
 		return -5;
+	if (buffer == nullptr)
+		return -6;
+	if (!_sink) // lazy-create the sink only after the input contract is valid
+		_sink = std::make_shared<fountain_decoder_sink>(chunkSize);
 
 	int64_t res = 0;
 	for (unsigned i = 0; i < size && res == 0; i+=chunkSize)
@@ -225,6 +310,8 @@ unsigned cimbard_get_filesize(uint32_t id)
 // stateful against a map (same as cimbard_decompress_read()
 int cimbard_get_filename(uint32_t id, char* filename, unsigned fnsize)
 {
+	if (filename == nullptr && fnsize > 0U)
+		return -15;
 	int	res = recover_contents(id);
 	if (res < 0)
 		return res;
@@ -246,6 +333,8 @@ int cimbard_get_filename(uint32_t id, char* filename, unsigned fnsize)
 
 int cimbard_decompress_read(uint32_t id, unsigned char* buffer, unsigned size)
 {
+	if (buffer == nullptr && size > 0U)
+		return -15;
 	int	res = recover_contents(id);
 	if (res < 0)
 		return res;
@@ -269,6 +358,17 @@ int cimbard_get_decompress_bufsize()
 	return ZSTD_DStreamOutSize();
 }
 
+int cimbard_reset_decode()
+{
+	_sink.reset();
+	_decId = 0U;
+	_reassembled.clear();
+	_dec.reset();
+	_reporting.clear();
+	_debugFrame.release();
+	return 0;
+}
+
 int cimbard_configure_decode(int mode_val)
 {
 	// defaults
@@ -281,7 +381,7 @@ int cimbard_configure_decode(int mode_val)
 		// update config
 		_modeVal = mode_val;
 		cimbar::Config::update(mode_val);
-		_sink.reset();
+		cimbard_reset_decode();
 	}
 
 	return 0;

@@ -53,6 +53,7 @@ namespace {
 
 TEST_CASE( "cimbar_recv_jsTest/testWirehairReassemble", "[unit]" )
 {
+	assertEquals(0, cimbard_reset_decode());
 	std::vector<unsigned char> buff;
 	buff.resize(cimbard_get_bufsize());
 
@@ -96,12 +97,21 @@ TEST_CASE( "cimbar_recv_jsTest/testWirehairReassemble", "[unit]" )
 
 TEST_CASE( "cimbar_recv_jsTest/testFullDecode", "[unit]" )
 {
+	assertEquals(0, cimbard_reset_decode());
 	std::vector<unsigned char> buff;
 	buff.resize(cimbard_get_bufsize());
 
 	cv::Mat img = TestCimbar::loadSample("b/4cecc30f.png");
 
-	int bytes = cimbard_scan_extract_decode(img.data, img.cols, img.rows, 3, buff.data(), buff.size());
+	int bytes = cimbard_scan_extract_decode_checked(
+		img.data,
+		img.total() * img.elemSize(),
+		img.cols,
+		img.rows,
+		CIMBARD_PIXEL_FORMAT_RGB,
+		buff.data(),
+		buff.size()
+	);
 	assertEquals(bytes, 7500);
 
 	unsigned chunkSize = cimbar::Config::fountain_chunk_size();
@@ -136,5 +146,43 @@ TEST_CASE( "cimbar_recv_jsTest/testFullDecode", "[unit]" )
 		assertEquals( 7538, ss.str().size() ); // decompressed
 	}
 
+	// A completed encode ID is terminal inside the current session.
+	assertTrue(cimbard_fountain_decode(buff.data(), bytes) < 0);
+
+	// Reuse requires an explicit session boundary, which also clears old output.
+	assertEquals(0, cimbard_reset_decode());
+	assertTrue(cimbard_get_reassembled_file_buff() == nullptr);
+	assertTrue(cimbard_fountain_decode(buff.data(), bytes) > 0);
+	assertEquals(0, cimbard_reset_decode());
+
+}
+
+TEST_CASE( "cimbar_recv_jsTest/rejectsMalformedRawFrameCalls", "[unit]" )
+{
+	std::vector<unsigned char> output(cimbard_get_bufsize());
+	std::vector<unsigned char> rgb(2U * 2U * 3U, 0U);
+
+	assertEquals(CIMBARD_SCAN_NULL_POINTER,
+		cimbard_scan_extract_decode_checked(nullptr, rgb.size(), 2, 2, 3, output.data(), output.size()));
+	assertEquals(CIMBARD_SCAN_NULL_POINTER,
+		cimbard_scan_extract_decode_checked(rgb.data(), rgb.size(), 2, 2, 3, nullptr, output.size()));
+	assertEquals(CIMBARD_SCAN_INVALID_DIMENSIONS,
+		cimbard_scan_extract_decode_checked(rgb.data(), rgb.size(), 0, 2, 3, output.data(), output.size()));
+	assertEquals(CIMBARD_SCAN_UNSUPPORTED_FORMAT,
+		cimbard_scan_extract_decode_checked(rgb.data(), rgb.size(), 2, 2, 99, output.data(), output.size()));
+	assertEquals(CIMBARD_SCAN_INVALID_BUFFER_SIZE,
+		cimbard_scan_extract_decode_checked(rgb.data(), rgb.size() - 1U, 2, 2, 3, output.data(), output.size()));
+	assertEquals(CIMBARD_SCAN_INVALID_BUFFER_SIZE,
+		cimbard_scan_extract_decode_checked(rgb.data(), rgb.size(), 3, 2, 12, output.data(), output.size()));
+	assertEquals(CIMBARD_SCAN_FRAME_TOO_LARGE,
+		cimbard_scan_extract_decode_checked(rgb.data(), rgb.size(), 4097, 4097, 3, output.data(), output.size()));
+	assertEquals(CIMBARD_SCAN_OUTPUT_BUFFER_TOO_SMALL,
+		cimbard_scan_extract_decode_checked(rgb.data(), rgb.size(), 2, 2, 3, output.data(), 0));
+
+	assertEquals(0U, cimbard_get_report(nullptr, 1));
+	assertEquals(0U, cimbard_get_debug(nullptr, 1));
+	assertEquals(-6, cimbard_fountain_decode(nullptr, cimbar::Config::fountain_chunk_size()));
+	assertEquals(-15, cimbard_get_filename(0, nullptr, 1));
+	assertEquals(-15, cimbard_decompress_read(0, nullptr, 1));
 }
 
