@@ -2,6 +2,7 @@
 #ifndef CIMBAR_RECV_JS_API_H
 #define CIMBAR_RECV_JS_API_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -11,9 +12,33 @@ extern "C" {
 unsigned cimbard_get_report(unsigned char* buff, unsigned maxlen);
 unsigned cimbard_get_debug(unsigned char* buff, unsigned maxlen);
 
-// imgsize=width*height*channels for rgba. Other formats are weirder.
+#define CIMBARD_MAX_FRAME_PIXELS (4096U * 4096U)
+
+enum cimbard_pixel_format {
+	CIMBARD_PIXEL_FORMAT_RGB = 3,
+	CIMBARD_PIXEL_FORMAT_RGBA = 4,
+	CIMBARD_PIXEL_FORMAT_NV12 = 12,
+	CIMBARD_PIXEL_FORMAT_I420 = 420
+};
+
+enum cimbard_scan_result {
+	CIMBARD_SCAN_INVALID_DIMENSIONS = -1,
+	CIMBARD_SCAN_OUTPUT_BUFFER_TOO_SMALL = -2,
+	CIMBARD_SCAN_EXTRACT_FAILED = -3,
+	CIMBARD_SCAN_NULL_POINTER = -4,
+	CIMBARD_SCAN_UNSUPPORTED_FORMAT = -5,
+	CIMBARD_SCAN_FRAME_TOO_LARGE = -6,
+	CIMBARD_SCAN_INVALID_BUFFER_SIZE = -7,
+	CIMBARD_SCAN_PROCESSING_ERROR = -8
+};
+
+// imgsize must exactly match the tightly packed frame dimensions and format.
 // output of scan is stored in `bufspace`
 int cimbard_get_bufsize();
+int cimbard_scan_extract_decode_checked(const unsigned char* imgdata, size_t imgsize, unsigned imgw, unsigned imgh, int format, unsigned char* bufspace, unsigned bufsize);
+
+// Compatibility wrapper for callers that cannot provide imgsize. New callers
+// should use cimbard_scan_extract_decode_checked().
 int cimbard_scan_extract_decode(const unsigned char* imgdata, unsigned imgw, unsigned imgh, int format, unsigned char* bufspace, unsigned bufsize);
 
 // returns id of final file (can be used to get size of `finish_copy`'s buffer) if complete, 0 if success, negative on error

@@ -44,7 +44,7 @@ var RecvWorker = function () {
 
       // then decode in wasm, fool
       const fountainBuff = RecvWorker.fountainBuff();
-      var len = Module._cimbard_scan_extract_decode(RecvWorker.imgBuff().byteOffset, width, height, type, fountainBuff.byteOffset, fountainBuff.length);
+      var len = Module._cimbard_scan_extract_decode_checked(RecvWorker.imgBuff().byteOffset, pixels.length, width, height, type, fountainBuff.byteOffset, fountainBuff.length);
       if (len <= 0) {
         var errmsg = RecvWorker.get_error();
         errmsg = len + " " + errmsg;

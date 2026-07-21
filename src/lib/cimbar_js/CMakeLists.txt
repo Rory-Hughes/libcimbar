@@ -69,6 +69,7 @@ set(LINK_WASM_EXPORTED_FUNCTIONS
 
 	, "_cimbard_get_report"
 	, "_cimbard_get_bufsize"
+	, "_cimbard_scan_extract_decode_checked"
 	, "_cimbard_scan_extract_decode"
 	, "_cimbard_fountain_decode"
 	, "_cimbard_get_filesize"

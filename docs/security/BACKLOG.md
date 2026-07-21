@@ -51,14 +51,14 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 **Priority:** P0  
 **Dependencies:** WP-01
 
-- [ ] Map raw frame to geometry extraction.
-- [ ] Map symbol extraction to ECC.
-- [ ] Map corrected payload to metadata.
-- [ ] Map fountain state and Wirehair calls.
-- [ ] Map optional decompression and output.
-- [ ] Record ownership, bounds, allocation, state, and failure behaviour for each transition.
+- [x] Map raw frame to geometry extraction.
+- [x] Map symbol extraction to ECC.
+- [x] Map corrected payload to metadata.
+- [x] Map fountain state and Wirehair calls.
+- [x] Map optional decompression and output.
+- [x] Record ownership, bounds, allocation, state, and failure behaviour for each transition.
 
-**Exit:** Every hostile-input-reachable function has a review status.
+**Exit:** Every hostile-input transition has a function-level review status in docs/security/ATTACK_SURFACE.md. Open controls are tracked in the owning work packages rather than treated as completed remediation.
 
 ## WP-05: Fountain metadata and state-machine fuzzing
 
