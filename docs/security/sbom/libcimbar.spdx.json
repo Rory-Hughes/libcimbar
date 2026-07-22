@@ -3,9 +3,9 @@
     "dataLicense":  "CC0-1.0",
     "SPDXID":  "SPDXRef-DOCUMENT",
     "name":  "libcimbar direct dependency inventory",
-    "documentNamespace":  "https://github.com/Rory-Hughes/libcimbar/spdx/390b99213baaff2bd95a801f22fc29067b0fbba3",
+    "documentNamespace":  "https://github.com/Rory-Hughes/libcimbar/spdx/b028e9d18d662ac07bdd7f030887843dd06a80e0",
     "creationInfo":  {
-                         "created":  "2026-07-21T20:14:21Z",
+                         "created":  "2026-07-22T03:55:29Z",
                          "creators":  [
                                           "Tool: scripts/generate-sbom.ps1"
                                       ],
@@ -18,14 +18,14 @@
                      {
                          "SPDXID":  "SPDXRef-libcimbar",
                          "name":  "libcimbar",
-                         "versionInfo":  "390b99213baaff2bd95a801f22fc29067b0fbba3",
-                         "downloadLocation":  "git+https://github.com/Rory-Hughes/libcimbar@390b99213baaff2bd95a801f22fc29067b0fbba3",
+                         "versionInfo":  "b028e9d18d662ac07bdd7f030887843dd06a80e0",
+                         "downloadLocation":  "git+https://github.com/Rory-Hughes/libcimbar@b028e9d18d662ac07bdd7f030887843dd06a80e0",
                          "filesAnalyzed":  false,
                          "licenseConcluded":  "MPL-2.0",
                          "licenseDeclared":  "MPL-2.0",
                          "copyrightText":  "NOASSERTION",
                          "primaryPackagePurpose":  "APPLICATION",
-                         "sourceInfo":  "Repository HEAD 390b99213baaff2bd95a801f22fc29067b0fbba3 with a dirty worktree at SBOM generation time.",
+                         "sourceInfo":  "Repository HEAD b028e9d18d662ac07bdd7f030887843dd06a80e0 with a dirty worktree at SBOM generation time.",
                          "comment":  "This SBOM covers the direct source and build dependencies documented in docs/security/DEPENDENCY_INVENTORY.md."
                      },
                      {
@@ -100,7 +100,7 @@
                          "checksums":  [
                                            {
                                                "algorithm":  "SHA256",
-                                               "checksumValue":  "695c4cc86ad5fcad17a824bf7c14ad8c7cda322570b609bb373a7f2135d3d0a6"
+                                               "checksumValue":  "f95d06d447dbeb3c543784bc4e845d39099ba64d5d6b314f029d17611a853d25"
                                            }
                                        ]
                      },
@@ -138,7 +138,7 @@
                          "checksums":  [
                                            {
                                                "algorithm":  "SHA256",
-                                               "checksumValue":  "eda50a3c8779ae939040ce5993f2a446de8c212fbbe777cf0c36ad57549c7cef"
+                                               "checksumValue":  "0b1b82496717666a8763166d00427a87699296aba52641f77b77cc0c1a604584"
                                            }
                                        ]
                      },

@@ -71,12 +71,57 @@ explicit object class and decoder limits. The session exposes only status,
 frame submission, cancellation/reset, and a single-take exact-length byte
 vector. It has no output callback, filename, path, decompression, or filesystem
 interface. Any negative decoder result fails the session closed and clears
-partial state; explicit reset is required before reuse.
+partial state; explicit reset is required before reuse. Decoder-state and
+completed-output allocation failures are contained at this boundary, as is
+output recovery refusal. None can expose a partial object, and all require an
+explicit reset before the session accepts another frame.
+
+The policy must also select equal, non-zero
+`maximum_codec_memory_bytes` and `maximum_active_codec_memory_bytes` values.
+Before constructing Wirehair, the sink reserves a conservative decoder heap
+bound calculated inside the vendored codec. It covers the codec object, input
+staging, peeling workspace, worst-case deferred solve matrix, pivot/heavy data,
+and Wirehair's explicit alignment overhead. Admission over either the
+per-stream or aggregate budget fails without creating stream state. This is a
+codec-owned heap bound, not a replacement for a process memory limit. Duplicate
+tracking uses a policy-sized fixed-index bitmap after block-ID validation; its
+absolute 16-bit protocol maximum is 8 KiB per decoder and smaller product
+policies allocate proportionally less. With completed-transfer retention set to
+zero, successful recovery also skips compatibility filename construction.
 
 Generic file/decompression callbacks remain available only through
 `fountain_decoder_file_sink.h` for compatibility applications. The restricted
-header does not include those dependencies. The full raw-frame `DecoderSession`
-and dedicated product build target remain outstanding.
+header does not include those dependencies.
+
+### Compiled hardened transport artifact
+
+`cimbar_hardened_transport` is the compiled, byte-only product-profile façade
+for corrected fountain packets. Its public methods are limited to explicit
+policy construction, status, frame submission, one exact-byte take,
+cancellation, and reset. The CMake target links only Wirehair.
+
+Build and verify the release profile with:
+
+```bash
+cmake --preset hardened-transport
+cmake --build --preset hardened-transport
+ctest --preset hardened-transport
+```
+
+Every archive and linked profile-test build runs
+`cmake/VerifyHardenedTransportArtifact.cmake`. The build fails if artifact
+symbols or strings contain zstd, decompression callbacks, filename parsers,
+`std::filesystem`, file streams, browser compatibility output functions, or
+session test-fault controls. The named preset builds the always-executed
+`verify_hardened_transport` target, so changing only the verifier still forces
+a fresh scan.
+The profile test reconstructs exact message and wallet bytes and refuses a
+second take.
+
+The full raw-frame `DecoderSession` that composes checked camera ingress with
+this transport artifact remains outstanding. The current top-level configure
+also discovers OpenCV even when only the transport target is built, although
+OpenCV is not linked into the artifact.
 
 ## Initial object profiles
 
@@ -95,7 +140,7 @@ The Secure Core selects the profile before scanning starts. Optical metadata can
 
 - One active reconstruction in the initial version.
 - No persistent completed-object map.
-- Bounded duplicate tracking.
+- Policy-sized duplicate bitmap, capped at 8 KiB per decoder.
 - Conflicting object size or transfer identity invalidates the session.
 - No-progress threshold aborts the session.
 - Timeout aborts the session.

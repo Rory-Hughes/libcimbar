@@ -1,0 +1,138 @@
+{
+  "entries": [
+    {
+      "description": "Empty metadata input.",
+      "filename": "empty.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0,
+      "target": "fountain_metadata"
+    },
+    {
+      "description": "One-byte truncated header.",
+      "filename": "one-byte.bin",
+      "sha256": "620bfdaa346b088fb49998d92f19a7eaf6bfc2fb0aee015753966da1028cb731",
+      "size": 1,
+      "target": "fountain_metadata"
+    },
+    {
+      "description": "Header truncated before the low block byte.",
+      "filename": "five-byte.bin",
+      "sha256": "9934195185201cce61d583085da1731757f21325f7de691a4a2d9025a4946cb6",
+      "size": 5,
+      "target": "fountain_metadata"
+    },
+    {
+      "description": "Canonical all-zero fields.",
+      "filename": "zero-fields.bin",
+      "sha256": "b0f66adc83641586656866813fd9dd0b8ebb63796075661ba45d1aa8089e1d44",
+      "size": 6,
+      "target": "fountain_metadata"
+    },
+    {
+      "description": "Ordinary canonical transfer metadata.",
+      "filename": "ordinary.bin",
+      "sha256": "5668fff21e2a1990b83477d41a5e6bd90261f364315447ac67311a05dd547f62",
+      "size": 6,
+      "target": "fountain_metadata"
+    },
+    {
+      "description": "Twenty-fifth object-size bit set.",
+      "filename": "size-high-bit.bin",
+      "sha256": "4571741cd4a956b2f194f5181662e61979faf9e79be1b9c919d295cc57f05d5c",
+      "size": 6,
+      "target": "fountain_metadata"
+    },
+    {
+      "description": "Maximum encodable ID, object size, and block ID.",
+      "filename": "maximum-fields.bin",
+      "sha256": "ce8bee525d6736e9825261b19a9b51719f9dc4bb728e95cf7067a2142b03b362",
+      "size": 6,
+      "target": "fountain_metadata"
+    },
+    {
+      "description": "Raw frame shorter than the six-byte metadata header.",
+      "filename": "frame-too-short.bin",
+      "sha256": "06a7b8cdf49ca1ae462f7b7e26fa0d2fa52bc14fcc78b7f73e26e8c1b5d7170e",
+      "size": 7,
+      "target": "fountain_state"
+    },
+    {
+      "description": "Non-empty 127-byte frame rejected before state mutation.",
+      "filename": "frame-misaligned.bin",
+      "sha256": "4a593ca42b16e99869b5bc4e4cf50cdc0dd59ce57b2415be482e711b6b546951",
+      "size": 129,
+      "target": "fountain_state"
+    },
+    {
+      "description": "Object requiring one Wirehair block fails configuration admission.",
+      "filename": "one-block-invalid.bin",
+      "sha256": "5f09f9b48f4965a88e9be325d4490821cdb8af8616e71e9f062beba9cb26be05",
+      "size": 128,
+      "target": "fountain_state"
+    },
+    {
+      "description": "Block ID one above the selected policy maximum.",
+      "filename": "block-policy-limit.bin",
+      "sha256": "6bf55cb7af9943198b9f13bc9c63bc0547ad117b904ab08b640a815bf38d407f",
+      "size": 128,
+      "target": "fountain_state"
+    },
+    {
+      "description": "Encode IDs separated by eight collide in a storage slot but retain distinct full IDs.",
+      "filename": "stream-slot-conflict.bin",
+      "sha256": "a5a9d488c45e6bb3b5925c2d27f2a64f0ab786486ea62e20d6801689f77817a2",
+      "size": 129,
+      "target": "fountain_state"
+    },
+    {
+      "description": "Duplicate packets consume no unique-block budget and eventually trigger bounded cancellation.",
+      "filename": "duplicate-no-progress-cancel.bin",
+      "sha256": "8ab97f26749e7ac78ca283fd3f45942708cfe0a57efe708351a571680fab940c",
+      "size": 130,
+      "target": "fountain_state"
+    },
+    {
+      "description": "Expiry sweep releases an incomplete transfer and its reservations.",
+      "filename": "timeout-release.bin",
+      "sha256": "e0cf1e3421f332df370c41cd251b1c5ad59928fbd29bf78b0136f455ec52da4a",
+      "size": 129,
+      "target": "fountain_state"
+    },
+    {
+      "description": "Explicit reset clears active and terminal state.",
+      "filename": "reset-release.bin",
+      "sha256": "8d69b09eb9680a735b45899b4204bda555291b2192e61a1ffad8afadbaeb8e4d",
+      "size": 129,
+      "target": "fountain_state"
+    },
+    {
+      "description": "Recovery request for an unknown little-endian identifier.",
+      "filename": "recover-unknown.bin",
+      "sha256": "3b0c49bf6a6b78f8d00f35324a5716c88661f7277cc32bde0ab93c131392b149",
+      "size": 5,
+      "target": "fountain_state"
+    },
+    {
+      "description": "Self-generated two-packet batch with conflicting transfer metadata.",
+      "filename": "mixed-batch-metadata.bin",
+      "sha256": "2b4c342f5433ebe591a1da77e013d1b72475562d48578dca8b84bac6651c3cb9",
+      "size": 1,
+      "target": "fountain_state"
+    },
+    {
+      "description": "Completed encode ID remains terminal after bounded detail-record eviction.",
+      "filename": "completion-replay-after-eviction.bin",
+      "sha256": "29668967703d958b67b3fccac391d0eef86e2cae8dc143285862e2e94c2eb039",
+      "size": 140,
+      "target": "fountain_state"
+    },
+    {
+      "description": "Replay is refused before reset and the encode ID may be reused only after reset.",
+      "filename": "completion-reuse-after-reset.bin",
+      "sha256": "e490734295bdcd071cf2b425075125c0ea2192aedbdf69fed7202f7b32119fd0",
+      "size": 72,
+      "target": "fountain_state"
+    }
+  ],
+  "schema_version": 1
+}

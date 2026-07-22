@@ -5,6 +5,7 @@
 
 #include "concurrentqueue/concurrentqueue.h"
 #include <mutex>
+#include <new>
 #include <utility>
 
 class concurrent_fountain_decoder_sink
@@ -22,21 +23,25 @@ public:
 
 	bool good() const
 	{
+		std::lock_guard<std::mutex> lock(_writeMutex);
 		return _decoder.good();
 	}
 
 	unsigned chunk_size() const
 	{
+		std::lock_guard<std::mutex> lock(_writeMutex);
 		return _decoder.chunk_size();
 	}
 
 	unsigned num_streams() const
 	{
+		std::lock_guard<std::mutex> lock(_writeMutex);
 		return _decoder.num_streams();
 	}
 
 	unsigned num_done() const
 	{
+		std::lock_guard<std::mutex> lock(_writeMutex);
 		return _decoder.num_done();
 	}
 
@@ -54,43 +59,54 @@ public:
 
 	void update_status()
 	{
-		// we call this under the writeMutex+readMutex. The `const`s are only under readMutex.
-		// just thought you ought to know
-		std::lock_guard<std::mutex> lock(_readMutex);
-		_done = _decoder.get_done();
-		_progress = _decoder.get_progress();
+		std::lock_guard<std::mutex> lock(_writeMutex);
+		update_status_locked();
 	}
 
 	void process()
 	{
-		if (_writeMutex.try_lock())
-		{
-			// maybe a 2nd mutex for retrieving _decoder.has_file()??
-			std::string buff;
-			while (_backlog.try_dequeue(buff))
-				_decoder << buff;
+		// Every producer waits to become a drainer. A non-blocking try_lock can
+		// strand the final packet when it is enqueued after the active drainer's
+		// last dequeue but before that drainer unlocks. RAII also releases the
+		// mutex if decoding or the completion callback throws.
+		std::lock_guard<std::mutex> lock(_writeMutex);
+		std::string buff;
+		while (_backlog.try_dequeue(buff))
+			_decoder << buff;
 
-			update_status();
-			_writeMutex.unlock();
-		}
+		update_status_locked();
 	}
 
 	bool write(const char* data, unsigned length)
 	{
+		if (data == nullptr)
+			return false;
 		std::string buffer(data, length);
-		operator<<(buffer);
+		if (!_backlog.enqueue(buffer))
+			return false;
+		process();
 		return true;
 	}
 
 	concurrent_fountain_decoder_sink& operator<<(const std::string& buffer)
 	{
-		_backlog.enqueue(buffer);
+		if (!_backlog.enqueue(buffer))
+			throw std::bad_alloc();
 		process();
 		return *this;
 	}
 
 protected:
-	std::mutex _writeMutex;
+	void update_status_locked()
+	{
+		// Lock order is always _writeMutex followed by _readMutex. Snapshot
+		// readers take only _readMutex and therefore cannot invert this order.
+		std::lock_guard<std::mutex> lock(_readMutex);
+		_done = _decoder.get_done();
+		_progress = _decoder.get_progress();
+	}
+
+	mutable std::mutex _writeMutex;
 	mutable std::mutex _readMutex;
 	fountain_decoder_sink _decoder;
 	moodycamel::ConcurrentQueue< std::string > _backlog;

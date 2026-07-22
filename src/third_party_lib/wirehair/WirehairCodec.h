@@ -1236,6 +1236,15 @@ public:
     Codec();
     ~Codec();
 
+    /// Conservative admission-control bound for a decoder configuration.
+    static WirehairResult DecoderMemoryRequired(
+        uint64_t message_bytes,
+        uint32_t block_bytes,
+        uint64_t& bytes_out);
+
+    /// Decoder-owned heap bytes currently allocated by this codec.
+    uint64_t DecoderMemoryAllocated() const;
+
 
     //--------------------------------------------------------------------------
     // Getters

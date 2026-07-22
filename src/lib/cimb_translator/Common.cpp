@@ -105,7 +105,7 @@ namespace detail {
 cv::Mat decode_image(const uint8_t* data, std::size_t size)
 {
 	static constexpr int maximum_dimension = 4096;
-	static constexpr std::size_t maximum_pixels = 16U * 1024U * 1024U;
+	static constexpr std::size_t maximum_pixels = std::size_t{16U} * 1024U * 1024U;
 	static constexpr int output_channels = STBI_rgb_alpha;
 
 	if (data == nullptr || size == 0U ||

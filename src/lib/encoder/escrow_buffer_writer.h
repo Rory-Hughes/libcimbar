@@ -2,6 +2,8 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
+#include <limits>
 #include <string>
 
 class escrow_buffer_writer
@@ -12,6 +14,11 @@ public:
 		, _bufcount(bufcount)
 		, _bufsize(bufsize)
 	{
+		const std::size_t maximum_offset =
+		    static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max());
+		if (_bufspace == nullptr || _bufcount == 0U || _bufsize == 0U ||
+		    _bufcount > maximum_offset / _bufsize)
+			_good = false;
 	}
 
 	bool good() const
@@ -24,7 +31,7 @@ public:
 		return _bufsize;
 	}
 
-	long tellp() const
+	std::size_t tellp() const
 	{
 		return _totalCount;
 	}
@@ -40,13 +47,14 @@ public:
 
 		// we can only write if the bufsize matches
 		// and if we have buffers left
-		if (length != _bufsize or _bufIdx>= _bufcount)
+		if (data == nullptr || length != _bufsize || _bufIdx >= _bufcount)
 			_good = false;
 
 		if (!good())
 			return *this;
 
-		std::copy(data, data+length, _bufspace+(_bufIdx*_bufsize));
+		const std::size_t offset = _bufIdx * _bufsize;
+		std::copy(data, data + length, _bufspace + offset);
 
 		_totalCount += length;
 		++_bufIdx;
@@ -60,10 +68,10 @@ public:
 
 protected:
 	unsigned char* _bufspace;
-	unsigned _bufcount;
-	unsigned _bufsize;
+	std::size_t _bufcount;
+	std::size_t _bufsize;
 
-	unsigned _bufIdx = 0;
-	long _totalCount = 0;
+	std::size_t _bufIdx = 0U;
+	std::size_t _totalCount = 0U;
 	bool _good = true;
 };

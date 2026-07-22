@@ -6,15 +6,19 @@ This directory contains security-focused fuzzing scaffolding for the hardened li
 
 `fuzz_fountain_metadata` exercises the six-byte fountain metadata parser and its field accessors under libFuzzer, AddressSanitizer, and UndefinedBehaviorSanitizer.
 
-`fuzz_fountain_state` drives raw and structured frames, mixed batched metadata, duplicate and conflicting blocks, recovery, no-progress cancellation, timeout, completion, replay, and reset through `fountain_decoder_sink`. It uses a 4 KiB object limit, one active stream, 64 unique blocks, a maximum block ID of 96, four packets per frame, bounded transfer budgets, two retained completion details, and fixed terminal encode-ID tracking, so arbitrary inputs cannot trigger large decoder allocations, bypass packet policy inside a batch, or duplicate successful output within a session.
+`fuzz_fountain_state` drives raw and structured frames, mixed batched metadata, duplicate and conflicting blocks, recovery, no-progress cancellation, timeout, completion, replay, and reset through `fountain_decoder_sink`. It uses a 4 KiB object limit, one active stream, a Wirehair heap budget derived from the worst-case 4 KiB decoder estimate, 64 unique blocks, a maximum block ID of 96, four packets per frame, bounded transfer budgets, two retained completion details, and fixed terminal encode-ID tracking, so arbitrary inputs cannot trigger large decoder allocations, bypass packet policy inside a batch, or duplicate successful output within a session.
 
 Build locally with a recent Clang and CMake:
 
 ```bash
 cmake -S fuzz -B out/fuzz -G Ninja -DCMAKE_CXX_COMPILER=clang++
 cmake --build out/fuzz
-./out/fuzz/fuzz_fountain_metadata -runs=100000
-./out/fuzz/fuzz_fountain_state -runs=10000 -max_len=512
+python3 fuzz/corpus/generate.py --check
+mkdir -p out/fuzz-corpus/fountain_metadata out/fuzz-corpus/fountain_state
+cp fuzz/corpus/fountain_metadata/*.bin out/fuzz-corpus/fountain_metadata/
+cp fuzz/corpus/fountain_state/*.bin out/fuzz-corpus/fountain_state/
+./out/fuzz/fuzz_fountain_metadata out/fuzz-corpus/fountain_metadata -runs=100000
+./out/fuzz/fuzz_fountain_state out/fuzz-corpus/fountain_state -runs=10000 -max_len=512
 ```
 
 ## Planned targets
@@ -42,7 +46,11 @@ cmake --build out/fuzz
 
 ## Corpus layout
 
-Planned directories:
+The committed fountain corpora are generated deterministically by
+`fuzz/corpus/generate.py`. `fuzz/corpus/manifest.json` records each seed's
+target, size, SHA-256 digest, and security purpose. Regenerate after an
+intentional corpus change and use `--check` in CI or review to detect missing,
+modified, or unexpected binary entries.
 
 ```text
 fuzz/corpus/fountain_metadata/
@@ -51,6 +59,13 @@ fuzz/corpus/corrected_payload/
 fuzz/corpus/raw_frame/
 fuzz/corpus/frame_sequence/
 ```
+
+The metadata corpus covers empty and truncated headers, ordinary values,
+high-bit encoding, and all maximum-width fields. The state corpus preserves
+regressions for short/misaligned frames, invalid one-block configurations,
+block-policy rejection, full-ID stream-slot conflicts, duplicate/no-progress
+cancellation, timeout/reset cleanup, mixed batched metadata, completion replay
+after detail eviction, and allowed reuse only after explicit reset.
 
 Do not publicly commit a crash input that exposes an undisclosed exploitable vulnerability. Store private reproducers in the coordinated finding process described in `SECURITY.md`.
 

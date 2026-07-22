@@ -1,0 +1,93 @@
+name: security-static-analysis
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - hardening-scaffold
+    paths:
+      - CMakeLists.txt
+      - CMakePresets.json
+      - src/**
+      - scripts/check-clang-sarif.py
+      - .github/workflows/security-static-analysis.yml
+  pull_request:
+    paths:
+      - CMakeLists.txt
+      - CMakePresets.json
+      - src/**
+      - scripts/check-clang-sarif.py
+      - .github/workflows/security-static-analysis.yml
+
+permissions:
+  contents: read
+
+jobs:
+  clang-analysis:
+    name: Clang first-party analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install analysis dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            clang \
+            clang-tidy \
+            clang-tools \
+            cmake \
+            ninja-build \
+            libopencv-dev \
+            libglfw3-dev \
+            libgles2-mesa-dev
+
+      - name: Generate release compilation database
+        run: cmake --preset hardened-transport
+
+      - name: Run focused clang-tidy gate
+        run: |
+          run-clang-tidy-18 \
+            -p out/build/hardened-transport \
+            -j 2 \
+            -quiet \
+            -warnings-as-errors='*' \
+            -checks='-*,clang-analyzer-core.*,clang-analyzer-cplusplus.*,clang-analyzer-security.*,clang-analyzer-unix.*,bugprone-implicit-widening-of-multiplication-result,bugprone-sizeof-expression,bugprone-signed-char-misuse,bugprone-string-constructor,bugprone-suspicious-memset-usage,bugprone-undefined-memory-manipulation,cert-err33-c,cert-str34-c' \
+            -header-filter='^.*/src/lib/.*' \
+            '^.*/src/lib/(?!.*test/)(?!.*third_party_lib/).*[.]cpp$'
+
+      - name: Run Clang static analyzer
+        run: |
+          analyze-build-18 \
+            --cdb out/build/hardened-transport/compile_commands.json \
+            --output out/analysis/clang-static \
+            --sarif \
+            --keep-empty \
+            --exclude "$GITHUB_WORKSPACE/src/third_party_lib" \
+            --exclude "$GITHUB_WORKSPACE/src/lib/bit_file/test" \
+            --exclude "$GITHUB_WORKSPACE/src/lib/chromatic_adaptation/test" \
+            --exclude "$GITHUB_WORKSPACE/src/lib/cimb_translator/test" \
+            --exclude "$GITHUB_WORKSPACE/src/lib/cimbar_js/test" \
+            --exclude "$GITHUB_WORKSPACE/src/lib/compression/test" \
+            --exclude "$GITHUB_WORKSPACE/src/lib/encoder/test" \
+            --exclude "$GITHUB_WORKSPACE/src/lib/extractor/test" \
+            --exclude "$GITHUB_WORKSPACE/src/lib/fountain/test" \
+            --exclude "$GITHUB_WORKSPACE/src/lib/image_hash/test" \
+            --exclude "$GITHUB_WORKSPACE/src/profile/hardened_transport/test" \
+            --exclude "$GITHUB_WORKSPACE/src/exe"
+
+      - name: Enforce first-party SARIF gate
+        run: python3 scripts/check-clang-sarif.py out/analysis/clang-static
+
+      - name: Upload analyzer evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-static-analysis-sarif
+          path: out/analysis/clang-static/**/results-merged.sarif
+          if-no-files-found: error

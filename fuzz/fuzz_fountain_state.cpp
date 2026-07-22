@@ -7,7 +7,6 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <string>
 #include <vector>
 
@@ -33,11 +32,24 @@ using frame = std::array<std::uint8_t, chunk_size>;
 	__builtin_trap();
 }
 
+std::size_t max_codec_memory()
+{
+	static const std::size_t value = [] {
+		const auto required = FountainDecoder::decoder_memory_required(max_object_size, packet_size);
+		return required.value_or(0U);
+	}();
+	if (value == 0U)
+		invariant_failure();
+	return value;
+}
+
 FountainDecoderLimits fuzz_limits()
 {
 	FountainDecoderLimits limits;
 	limits.maximum_object_size = max_object_size;
 	limits.maximum_active_object_bytes = max_object_size;
+	limits.maximum_codec_memory_bytes = max_codec_memory();
+	limits.maximum_active_codec_memory_bytes = max_codec_memory();
 	limits.maximum_unique_blocks = max_unique_blocks;
 	limits.maximum_block_id = max_block_id;
 	limits.maximum_active_streams = max_active_streams;
@@ -54,7 +66,8 @@ std::uint32_t read_identifier(const std::uint8_t* data, std::size_t size)
 {
 	std::uint32_t identifier = 0U;
 	const std::size_t count = std::min(size, sizeof(identifier));
-	std::memcpy(&identifier, data, count);
+	for (std::size_t index = 0U; index < count; ++index)
+		identifier |= static_cast<std::uint32_t>(data[index]) << (index * 8U);
 	return identifier;
 }
 
@@ -62,7 +75,8 @@ std::uint16_t read_u16(const std::uint8_t* data, std::size_t size)
 {
 	std::uint16_t value = 0U;
 	const std::size_t count = std::min(size, sizeof(value));
-	std::memcpy(&value, data, count);
+	for (std::size_t index = 0U; index < count; ++index)
+		value |= static_cast<std::uint16_t>(data[index]) << (index * 8U);
 	return value;
 }
 
@@ -103,7 +117,8 @@ void assert_bounds(const fountain_decoder_sink& sink)
 	if (sink.num_streams() > max_active_streams ||
 	    sink.num_done() > max_completed_transfers ||
 	    sink.num_cancelled() > max_cancelled_transfers ||
-	    sink.active_object_bytes() > max_object_size)
+	    sink.active_object_bytes() > max_object_size ||
+	    sink.active_codec_memory_bytes() > max_codec_memory())
 	{
 		invariant_failure();
 	}

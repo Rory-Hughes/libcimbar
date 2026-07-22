@@ -38,13 +38,15 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 
 - [x] Enable GitHub Actions for the fork if required.
 - [x] Run ASan and UBSan presets and record the repaired baseline.
-- [ ] Attempt MemorySanitizer with compatible dependencies.
-- [ ] Run ThreadSanitizer on concurrent receiver paths.
+- [x] Attempt MemorySanitizer with compatible dependencies.
+- [x] Run ThreadSanitizer on concurrent receiver paths.
 - [x] Run cppcheck against first-party sources and record the baseline.
-- [ ] Run clang-tidy, CodeQL, and Clang static analyzer.
+- [x] Run clang-tidy against first-party production sources.
+- [x] Run CodeQL.
+- [x] Run Clang static analyzer and ownership-filter its SARIF output.
 - [x] Record and triage cppcheck findings before fixing or suppressing warnings.
 
-**Exit:** Baseline diagnostics are triaged and new blocking findings fail CI. Initial cppcheck evidence is recorded in docs/security/evidence/2026-07-21-cppcheck-first-party.md, and the repaired ASan/UBSan and fuzzer baseline is recorded in docs/security/evidence/2026-07-21-ci-sanitizer-alignment.md. MemorySanitizer, ThreadSanitizer, clang-tidy, CodeQL, and Clang static analyzer work remain outstanding.
+**Exit:** Baseline diagnostics are triaged and new blocking findings fail CI. Initial cppcheck evidence is recorded in docs/security/evidence/2026-07-21-cppcheck-first-party.md, the repaired ASan/UBSan and fuzzer baseline is recorded in docs/security/evidence/2026-07-21-ci-sanitizer-alignment.md, the focused receiver-concurrency result is recorded in docs/security/evidence/2026-07-21-thread-sanitizer-receiver.md, the focused MemorySanitizer result is recorded in docs/security/evidence/2026-07-21-memory-sanitizer-hardened-transport.md, the Clang source-analysis baseline is recorded in docs/security/evidence/2026-07-21-clang-static-analysis.md, and the production CodeQL baseline is recorded in docs/security/evidence/2026-07-22-codeql-cpp-production.md. WP-03 is complete.
 
 ## WP-04: Complete the function-level attack-surface map
 
@@ -66,13 +68,13 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 **Dependencies:** WP-03
 
 - [x] Add initial `FountainMetadata` libFuzzer harness.
-- [ ] Seed and run the metadata corpus.
+- [x] Seed and run the metadata corpus.
 - [x] Design structured state-machine input operations.
 - [x] Add start, block, duplicate, conflict, recover, cancel, timeout, and reset operations.
 - [x] Measure peak state and memory for the bounded smoke campaign.
-- [ ] Add regression corpus entries for every defect.
+- [x] Add deterministic regression corpus entries for the fountain state defects fixed on this branch.
 
-**Exit:** Conflicting and adversarial transfer sequences remain bounded and deterministic.
+**Exit:** Conflicting and adversarial transfer sequences remain bounded and deterministic. Nineteen named, hashed seeds are reproducible from `fuzz/corpus/generate.py`; CI verifies them, copies them to a writable campaign corpus, and runs both sanitizer fuzz targets with the seeded inputs.
 
 ## WP-06: Introduce a bounded transfer policy
 
@@ -86,11 +88,11 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 - [x] Define the fountain-stage `FountainTransferPolicy` and object classes selected by the Secure Core.
 - [x] Validate every packet in a frame and limit block identifiers, packets per frame, frames, and no-progress frames.
 - [x] Limit transfer duration and aggregate active object bytes across streams.
-- [ ] Instrument or otherwise bound third-party codec overhead against a total decoder memory budget.
+- [x] Instrument and bound third-party codec overhead against per-stream and aggregate decoder memory budgets before codec construction.
 - [x] Define deterministic cancel and reset with bounded cancellation retention.
 - [x] Ensure successful completion occurs at most once per encode ID until explicit session reset.
 
-**Exit:** Optical metadata cannot enlarge Secure-Core-selected resource limits.
+**Exit:** Optical metadata cannot enlarge Secure-Core-selected resource limits. Wirehair now exposes a conservative worst-case decoder heap estimate and current-allocation instrumentation; the restricted session requires explicit equal per-stream and aggregate codec budgets for its single active stream.
 
 ## WP-07: Replace generic output with bounded object API
 
@@ -101,23 +103,23 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 - [x] Return exact-length opaque bytes through a single-take ownership transfer.
 - [x] Keep filename, MIME, path, callback, and application-route semantics out of the restricted API; isolate generic filesystem helpers in a compatibility header.
 - [x] Ensure partial objects never cross the restricted API.
-- [ ] Test allocation failure and output refusal.
+- [x] Test decoder allocation failure, completed-output allocation failure, and output recovery refusal with production-disabled fault injection.
 
-**Exit:** The decoder has no generic file or application action interface.
+**Exit:** The decoder has no generic file or application action interface. Allocation and recovery refusal fail closed, expose no object, and require explicit reset before successful reuse.
 
 ## WP-08: Remove decompression and filesystem paths from product profile
 
 **Priority:** P0  
 **Dependencies:** WP-04
 
-- [ ] Create product build option or target.
-- [ ] Exclude zstd from message and wallet profile.
-- [ ] Exclude filename parsing.
-- [ ] Exclude arbitrary filesystem output.
-- [ ] Exclude output-directory selection.
-- [ ] Verify removed symbols and dependencies are absent from the production binary.
+- [x] Create product build option or target.
+- [x] Exclude zstd from message and wallet profile.
+- [x] Exclude filename parsing.
+- [x] Exclude arbitrary filesystem output.
+- [x] Exclude output-directory selection.
+- [x] Verify removed symbols and dependencies are absent from the hardened archive and fully linked profile test.
 
-**Exit:** Product profile reconstructs bytes without decompression or file creation.
+**Exit:** `cimbar_hardened_transport` reconstructs message and wallet bytes without decompression or file creation. Its CMake link interface is Wirehair-only, and every build scans both the archive and linked profile test for forbidden dependencies and symbols.
 
 ## WP-09: Raw-frame and geometry fuzzing
 

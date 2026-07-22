@@ -37,6 +37,8 @@ public:
 	static constexpr int64_t frame_size_misaligned = -23;
 	static constexpr int64_t conflicting_packet_metadata = -24;
 	static constexpr int64_t block_id_exceeds_limit = -25;
+	static constexpr int64_t codec_memory_exceeds_limit = -26;
+	static constexpr int64_t active_codec_memory_limit_reached = -27;
 	static constexpr std::size_t encode_id_count = 128U;
 
 	fountain_decoder_sink(
@@ -82,7 +84,6 @@ public:
 
 	void mark_done(const FountainMetadata& md, const std::string& filename)
 	{
-		_completedEncodeIds.set(md.encode_id());
 		if (_limits.maximum_completed_transfers > 0U)
 		{
 			auto done = _done.find(md.id());
@@ -101,7 +102,12 @@ public:
 				_doneOrder.push_back(md.id());
 			}
 		}
+		mark_done(md);
+	}
 
+	void mark_done(const FountainMetadata& md)
+	{
+		_completedEncodeIds.set(md.encode_id());
 		erase_stream(stream_slot(md));
 	}
 
@@ -116,6 +122,7 @@ public:
 		_cancelledOrder.clear();
 		_completedEncodeIds.reset();
 		_activeObjectBytes = 0U;
+		_activeCodecMemoryBytes = 0U;
 	}
 
 	unsigned num_streams() const
@@ -136,6 +143,11 @@ public:
 	std::size_t active_object_bytes() const
 	{
 		return _activeObjectBytes;
+	}
+
+	std::size_t active_codec_memory_bytes() const
+	{
+		return _activeCodecMemoryBytes;
 	}
 
 	std::vector<std::string> get_done() const
@@ -235,6 +247,25 @@ public:
 		    static_cast<std::size_t>(md.file_size()) > _limits.maximum_active_object_bytes - _activeObjectBytes)
 			return active_object_bytes_limit_reached;
 
+		std::size_t codec_memory_required = 0U;
+		if (stream == _streams.end())
+		{
+			const auto required = FountainDecoder::decoder_memory_required(
+			    md.file_size(),
+			    _chunkSize - FountainMetadata::md_size
+			);
+			if (!required)
+				return invalid_decoder_configuration;
+			codec_memory_required = *required;
+			if (_limits.maximum_codec_memory_bytes > 0U &&
+			    codec_memory_required > _limits.maximum_codec_memory_bytes)
+				return codec_memory_exceeds_limit;
+			if (_limits.maximum_active_codec_memory_bytes > 0U &&
+			    (_activeCodecMemoryBytes > _limits.maximum_active_codec_memory_bytes ||
+			     codec_memory_required > _limits.maximum_active_codec_memory_bytes - _activeCodecMemoryBytes))
+				return active_codec_memory_limit_reached;
+		}
+
 		const unsigned maximum_unique_blocks = _limits.unique_block_limit(
 		    _chunkSize - FountainMetadata::md_size
 		);
@@ -242,12 +273,19 @@ public:
 			return invalid_decoder_configuration;
 
 		// Find or create after every metadata-derived allocation input has been checked.
-		auto p = _streams.try_emplace(slot, md.file_size(), _chunkSize, maximum_unique_blocks);
+		auto p = _streams.try_emplace(
+		    slot,
+		    md.file_size(),
+		    _chunkSize,
+		    maximum_unique_blocks,
+		    _limits.maximum_block_id
+		);
 		if (p.second)
 		{
 			_streamIds.insert_or_assign(slot, md.id());
-			_streamBudgets.insert_or_assign(slot, StreamBudget{now});
+			_streamBudgets.insert_or_assign(slot, StreamBudget{now, 0U, 0U, codec_memory_required});
 			_activeObjectBytes += md.file_size();
+			_activeCodecMemoryBytes += codec_memory_required;
 		}
 		fountain_decoder_stream& s = p.first->second;
 		if (!s.good() || s.data_size() != md.file_size())
@@ -317,7 +355,12 @@ public:
 			return false;
 		bool res = s.recover(data, size);
 		if (res)
-			mark_done(md, get_filename(md));
+		{
+			if (_limits.maximum_completed_transfers > 0U)
+				mark_done(md, get_filename(md));
+			else
+				mark_done(md);
+		}
 		return res;
 	}
 
@@ -327,6 +370,7 @@ protected:
 		time_point started_at;
 		unsigned frames = 0U;
 		unsigned no_progress_frames = 0U;
+		std::size_t codec_memory_bytes = 0U;
 	};
 
 	// streams is limited to at most 8 decoders at a time. Currently, we just use the lower bits of the encode_id.
@@ -341,6 +385,9 @@ protected:
 		if (stream != _streams.end())
 		{
 			_activeObjectBytes -= stream->second.data_size();
+			auto budget = _streamBudgets.find(slot);
+			if (budget != _streamBudgets.end())
+				_activeCodecMemoryBytes -= budget->second.codec_memory_bytes;
 			_streams.erase(stream);
 		}
 		_streamIds.erase(slot);
@@ -391,6 +438,7 @@ protected:
 	FountainDecoderLimits _limits;
 	now_function _now;
 	std::size_t _activeObjectBytes = 0U;
+	std::size_t _activeCodecMemoryBytes = 0U;
 
 	std::unordered_map<uint8_t, fountain_decoder_stream> _streams;
 	// A stream slot is only a storage bucket; the full metadata ID binds it to a transfer.

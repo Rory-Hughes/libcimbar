@@ -103,6 +103,7 @@ else()
 	set(LIBCIMBAR_BUILD_GUI_TOOLS_DEFAULT ON)
 endif()
 option(LIBCIMBAR_BUILD_GUI_TOOLS "Build OpenGL/GLFW live send and receive tools" ${LIBCIMBAR_BUILD_GUI_TOOLS_DEFAULT})
+option(LIBCIMBAR_BUILD_HARDENED_TRANSPORT "Build the byte-only hardened fountain transport profile" ON)
 
 if(NOT DEFINED USE_WASM)
 set(PROJECTS
@@ -124,6 +125,14 @@ set(PROJECTS
 endif()
 endif()
 
+if(LIBCIMBAR_BUILD_HARDENED_TRANSPORT)
+set(PROJECTS
+	${PROJECTS}
+
+	src/profile/hardened_transport
+)
+endif()
+
 include_directories(
 	${libcimbar_SOURCE_DIR}/src/lib
 	${libcimbar_SOURCE_DIR}/src/third_party_lib
@@ -132,5 +141,4 @@ include_directories(
 foreach(proj ${PROJECTS})
 	add_subdirectory(${proj} build/${proj})
 endforeach()
-
 

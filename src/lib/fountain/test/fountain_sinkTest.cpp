@@ -72,6 +72,8 @@ namespace {
 		policy.object_class = FountainObjectClass::message;
 		policy.decoder_limits.maximum_object_size = maximum_object_size;
 		policy.decoder_limits.maximum_active_object_bytes = maximum_object_size;
+		policy.decoder_limits.maximum_codec_memory_bytes = 1024U * 1024U;
+		policy.decoder_limits.maximum_active_codec_memory_bytes = 1024U * 1024U;
 		policy.decoder_limits.maximum_active_streams = 1U;
 		policy.decoder_limits.maximum_completed_transfers = 0U;
 		policy.decoder_limits.maximum_unique_blocks = 64U;
@@ -81,6 +83,133 @@ namespace {
 		policy.decoder_limits.maximum_no_progress_frames = 16U;
 		return policy;
 	}
+}
+
+TEST_CASE( "FountainSinkTest/testBoundsWirehairCodecMemoryBeforeStateMutation", "[unit]" )
+{
+	const auto required = FountainDecoder::decoder_memory_required(2048U, test_chunk_size - FountainMetadata::md_size);
+	assertTrue(required.has_value());
+	assertTrue(*required > 1U);
+
+	FountainDecoderLimits limits;
+	limits.maximum_object_size = 2048U;
+	limits.maximum_active_object_bytes = 2048U;
+	limits.maximum_codec_memory_bytes = *required - 1U;
+	limits.maximum_active_codec_memory_bytes = *required;
+	fountain_decoder_sink rejected(test_chunk_size, nullptr, limits);
+	const auto frame = metadata_frame(2, 2048);
+	assertEquals(
+	    fountain_decoder_sink::codec_memory_exceeds_limit,
+	    rejected.decode_frame(frame.data(), static_cast<unsigned>(frame.size()))
+	);
+	assertEquals(0, rejected.num_streams());
+	assertEquals(0, rejected.active_codec_memory_bytes());
+
+	limits.maximum_codec_memory_bytes = *required;
+	fountain_decoder_sink admitted(test_chunk_size, nullptr, limits);
+	assertEquals(0, admitted.decode_frame(frame.data(), static_cast<unsigned>(frame.size())));
+	assertEquals(1, admitted.num_streams());
+	assertEquals(*required, admitted.active_codec_memory_bytes());
+	admitted.reset();
+	assertEquals(0, admitted.active_codec_memory_bytes());
+}
+
+TEST_CASE( "FountainDecoderTest/reportsAllocatedMemoryWithinAdmissionBound", "[unit]" )
+{
+	const std::string encoded = createFrame(9, 1200U);
+	const auto required = FountainDecoder::decoder_memory_required(1200U, test_chunk_size - FountainMetadata::md_size);
+	assertTrue(required.has_value());
+	FountainDecoder decoder(1200U, test_chunk_size - FountainMetadata::md_size);
+	assertTrue(decoder.good());
+	assertTrue(decoder.decoder_memory_allocated() > 0U);
+	assertTrue(decoder.decoder_memory_allocated() <= *required);
+
+	bool finished = false;
+	for (std::size_t offset = 0U; offset < encoded.size(); offset += test_chunk_size)
+	{
+		const auto* packet = reinterpret_cast<const std::uint8_t*>(encoded.data() + offset);
+		const unsigned block_id = static_cast<unsigned>(packet[4]) << 8U | packet[5];
+		finished = decoder.decode(
+		    block_id,
+		    packet + FountainMetadata::md_size,
+		    test_chunk_size - FountainMetadata::md_size
+		);
+		assertTrue(decoder.decoder_memory_allocated() <= *required);
+		if (finished)
+			break;
+	}
+	assertTrue(finished);
+}
+
+TEST_CASE( "FountainDecoderTest/rejectsBlockCountBeforeNarrowing", "[unit][security]" )
+{
+	constexpr std::size_t wrapped_block_count =
+	    static_cast<std::size_t>(std::numeric_limits<std::uint16_t>::max()) + 3U;
+
+	assertFalse(FountainDecoder::decoder_memory_required(wrapped_block_count, 1U).has_value());
+	FountainDecoder decoder(wrapped_block_count, 1U);
+	assertFalse(decoder.good());
+}
+
+TEST_CASE( "FountainDecoderTest/boundsDuplicateTrackingWithBlockBitmap", "[unit][security]" )
+{
+	constexpr unsigned maximum_block_id = 127U;
+	const auto frame = metadata_frame(4U, 1200U, maximum_block_id);
+	FountainDecoder decoder(
+	    1200U,
+	    test_chunk_size - FountainMetadata::md_size,
+	    8U,
+	    maximum_block_id
+	);
+	assertTrue(decoder.good());
+
+	const auto* packet = reinterpret_cast<const std::uint8_t*>(frame.data());
+	assertFalse(decoder.decode(
+	    maximum_block_id,
+	    packet + FountainMetadata::md_size,
+	    test_chunk_size - FountainMetadata::md_size
+	));
+	assertEquals(1U, decoder.progress());
+
+	// A duplicate does not consume another unique-block slot.
+	assertFalse(decoder.decode(
+	    maximum_block_id,
+	    packet + FountainMetadata::md_size,
+	    test_chunk_size - FountainMetadata::md_size
+	));
+	assertEquals(1U, decoder.progress());
+
+	assertFalse(decoder.decode(
+	    maximum_block_id + 1U,
+	    packet + FountainMetadata::md_size,
+	    test_chunk_size - FountainMetadata::md_size
+	));
+	assertEquals(Wirehair_InvalidInput, decoder.last_result());
+	assertEquals(1U, decoder.progress());
+}
+
+TEST_CASE( "FountainSinkTest/boundsAggregateWirehairCodecMemory", "[unit]" )
+{
+	const auto required = FountainDecoder::decoder_memory_required(2048U, test_chunk_size - FountainMetadata::md_size);
+	assertTrue(required.has_value());
+	FountainDecoderLimits limits;
+	limits.maximum_object_size = 2048U;
+	limits.maximum_active_object_bytes = 4096U;
+	limits.maximum_active_streams = 2U;
+	limits.maximum_codec_memory_bytes = *required;
+	limits.maximum_active_codec_memory_bytes = *required;
+	fountain_decoder_sink sink(test_chunk_size, nullptr, limits);
+	const auto first = metadata_frame(2, 2048U);
+	const auto second = metadata_frame(3, 2048U);
+
+	assertEquals(0, sink.decode_frame(first.data(), static_cast<unsigned>(first.size())));
+	assertEquals(*required, sink.active_codec_memory_bytes());
+	assertEquals(
+	    fountain_decoder_sink::active_codec_memory_limit_reached,
+	    sink.decode_frame(second.data(), static_cast<unsigned>(second.size()))
+	);
+	assertEquals(1, sink.num_streams());
+	assertEquals(*required, sink.active_codec_memory_bytes());
 }
 
 TEST_CASE( "FountainSinkTest/testDefault", "[unit]" )
@@ -542,6 +671,11 @@ TEST_CASE( "FountainDecoderSession/testRejectsInvalidPolicyAndFailsClosed", "[un
 	retained_details.decoder_limits.maximum_completed_transfers = 1U;
 	fountain_decoder_session invalid_details(test_chunk_size, retained_details);
 	assertFalse(invalid_details.good());
+	FountainTransferPolicy missing_codec_budget = secure_message_policy();
+	missing_codec_budget.decoder_limits.maximum_codec_memory_bytes = 0U;
+	missing_codec_budget.decoder_limits.maximum_active_codec_memory_bytes = 0U;
+	fountain_decoder_session invalid_codec_budget(test_chunk_size, missing_codec_budget);
+	assertFalse(invalid_codec_budget.good());
 
 	fountain_decoder_session session(test_chunk_size, secure_message_policy(1024U));
 	const auto oversized = metadata_frame(0, 1025);
@@ -575,4 +709,46 @@ TEST_CASE( "FountainDecoderSession/testCancelClearsUntakenOutput", "[unit]" )
 	session.reset();
 	assertEquals(FountainSessionStatus::receiving, session.status());
 	assertEquals(1, session.submit_frame(encoded.data(), static_cast<unsigned>(encoded.size())));
+}
+
+TEST_CASE( "FountainDecoderSession/testAllocationAndOutputFaultsFailClosed", "[unit]" )
+{
+	using TestFault = fountain_decoder_session::TestFault;
+	struct FaultCase
+	{
+		TestFault fault;
+		std::int64_t expected_result;
+	};
+	const std::array<FaultCase, 3> faults{{
+		{TestFault::decoder_allocation, fountain_decoder_session::decoder_allocation_failed},
+		{TestFault::output_allocation, fountain_decoder_session::output_allocation_failed},
+		{TestFault::output_refusal, fountain_decoder_sink::output_recovery_failed},
+	}};
+	const string encoded = createFrame(0, 1200);
+	const string expected = dummyContents(1200).str();
+
+	for (const FaultCase& fault : faults)
+	{
+		fountain_decoder_session session(test_chunk_size, secure_message_policy());
+		session.inject_test_fault(fault.fault);
+
+		assertEquals(
+		    fault.expected_result,
+		    session.submit_frame(encoded.data(), static_cast<unsigned>(encoded.size()))
+		);
+		assertEquals(FountainSessionStatus::failed, session.status());
+		assertFalse(session.has_completed_object());
+		assertFalse(session.take_completed_object().has_value());
+		assertEquals(
+		    fountain_decoder_session::session_not_receiving,
+		    session.submit_frame(encoded.data(), static_cast<unsigned>(encoded.size()))
+		);
+
+		session.reset();
+		assertEquals(FountainSessionStatus::receiving, session.status());
+		assertEquals(1, session.submit_frame(encoded.data(), static_cast<unsigned>(encoded.size())));
+		auto object = session.take_completed_object();
+		assertTrue(object.has_value());
+		assertTrue(std::equal(expected.begin(), expected.end(), object->begin()));
+	}
 }

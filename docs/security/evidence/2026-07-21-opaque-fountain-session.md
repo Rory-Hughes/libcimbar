@@ -34,34 +34,41 @@ than once or perform a partial external side effect outside decoder ownership.
   fountain core and restricted session now compile against Wirehair alone.
 - Replaced hidden transitive includes in browser and generic CLI sources with
   direct dependencies.
+- Contained decoder-state and completed-output `std::bad_alloc` and
+  `std::length_error` failures inside the restricted session.
+- Added test-target-only deterministic controls for decoder allocation, output
+  allocation, and output recovery refusal. Normal builds do not compile these
+  controls or their fault branches.
 
 ## Focused Verification
 
 ```text
-fountain_test: 157223 assertions in 43 test cases passed
+fountain_test: 157310 assertions in 44 test cases passed
 encoder_test:  96 assertions in 25 test cases passed
 cimbar and cimbar_recv generic compatibility targets built successfully
-full ASan/UBSan CTest: 9/9 targets passed
+full ASan/UBSan CTest: 11/11 targets passed, including hardened-profile controls
 fuzz_fountain_state: 10,000 runs, no crash or sanitizer finding
 restricted header dependency check: no zstd, compression, File.h, or filesystem dependency
+normal preprocessing: no session test-fault identifiers or branches
 ```
 
 The final state-fuzzer campaign, after removing its zstd dependency, reached
-3,566 coverage points and 8,203 features with 165 MB peak RSS under the
+3,566 coverage points and 8,307 features with 159 MB peak RSS under the
 256 MB process limit.
 
 Regression coverage verifies exact recovered bytes, explicit object class,
 single take, refusal of later submissions, invalid-policy rejection, fail-closed
 oversized metadata, cancellation clearing untaken output, reset, and successful
-reuse in a new session.
+reuse in a new session. Each forced allocation/recovery fault additionally
+verifies that no object is observable, another frame is refused before reset,
+and exact-byte recovery succeeds after reset.
 
 ## Remaining Risk
 
-- Allocation failure is caught, but deterministic failure injection and output
-  refusal tests are still required before WP-07 is complete.
 - The session covers corrected fountain packets, not the raw-frame/OpenCV stages.
   The full product `DecoderSession` must compose the fixed camera boundary with
   this reconstruction stage.
 - A dedicated product build target must prove that zstd, filename parsing, and
   filesystem helpers are absent from the final artifact.
-- Wirehair internal overhead remains outside the explicit byte budget.
+- Wirehair internal overhead is now reserved against an explicit byte budget
+  before construction; see `2026-07-21-wirehair-decoder-memory-budget.md`.

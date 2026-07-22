@@ -2,6 +2,13 @@
 #ifndef CIMBAR_RECV_JS_API_H
 #define CIMBAR_RECV_JS_API_H
 
+// Compatibility API ownership contract:
+// The cimbard_* receiver functions below share process-global decoder,
+// reassembly, decompression, image, and reporting state. They must be invoked
+// serially by one worker/thread. Concurrent callers, or a reset/configuration
+// call racing an active decode, are unsupported. The hardened byte-only
+// transport profile does not link or expose this compatibility API.
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -12,7 +19,7 @@ extern "C" {
 unsigned cimbard_get_report(unsigned char* buff, unsigned maxlen);
 unsigned cimbard_get_debug(unsigned char* buff, unsigned maxlen);
 
-#define CIMBARD_MAX_FRAME_PIXELS (4096U * 4096U)
+#define CIMBARD_MAX_FRAME_PIXELS (UINT64_C(4096) * UINT64_C(4096))
 
 enum cimbard_pixel_format {
 	CIMBARD_PIXEL_FORMAT_RGB = 3,

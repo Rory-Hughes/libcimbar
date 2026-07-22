@@ -4,7 +4,9 @@
 #include "encoder/aligned_stream.h"
 #include "encoder/escrow_buffer_writer.h"
 
+#include <array>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -58,4 +60,23 @@ TEST_CASE( "escrow_buffer_writerTest/testAlign", "[unit]" )
 	assertEquals( 3, ebw.buffers_in_use() );
 	assertEquals( 30, ebw.tellp() );
 	assertEquals( "01234567890123456789efABCDEFGH", std::string_view((char*)bufspace.data(), 30) );
+}
+
+TEST_CASE( "escrow_buffer_writerTest/rejectsInvalidBufferContracts", "[unit][security]" )
+{
+	std::array<unsigned char, 8> storage{};
+	escrow_buffer_writer null_output(nullptr, 1U, 8U);
+	assertFalse(null_output.good());
+
+	escrow_buffer_writer null_input(storage.data(), 1U, 8U);
+	null_input.write(nullptr, 8U);
+	assertFalse(null_input.good());
+	assertEquals(0U, null_input.buffers_in_use());
+
+	escrow_buffer_writer impossible_span(
+	    storage.data(),
+	    std::numeric_limits<unsigned>::max(),
+	    std::numeric_limits<unsigned>::max()
+	);
+	assertFalse(impossible_span.good());
 }

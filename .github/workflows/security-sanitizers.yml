@@ -54,6 +54,72 @@ jobs:
       - name: Test
         run: ctest --preset asan-ubsan
 
+  tsan:
+    name: ThreadSanitizer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            clang \
+            cmake \
+            ninja-build \
+            libopencv-dev \
+            libglfw3-dev \
+            libgles2-mesa-dev
+
+      - name: Configure
+        run: cmake --preset tsan
+
+      - name: Build
+        run: cmake --build --preset tsan
+
+      - name: Test concurrent receiver path
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+        run: |
+          out/build/tsan/build/src/lib/fountain/test/fountain_init_concurrency_test
+          out/build/tsan/build/src/lib/fountain/test/fountain_test "[concurrency]"
+
+  memory-sanitizer:
+    name: MemorySanitizer hardened transport
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            clang \
+            cmake \
+            ninja-build \
+            libopencv-dev \
+            libglfw3-dev \
+            libgles2-mesa-dev
+
+      - name: Configure focused instrumented closure
+        run: cmake --preset memory-sanitizer
+
+      - name: Build hardened transport profile
+        run: cmake --build --preset memory-sanitizer
+
+      - name: Test hardened transport profile
+        run: ctest --preset memory-sanitizer
+
   fuzz-smoke:
     name: Metadata fuzzer smoke test
     runs-on: ubuntu-24.04
@@ -74,18 +140,26 @@ jobs:
       - name: Build fuzzer
         run: cmake --build out/fuzz
 
+      - name: Verify regression corpus
+        run: python3 fuzz/corpus/generate.py --check
+
       - name: Run smoke campaign
         env:
           ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: |
           mkdir -p out/fuzz-artifacts
+          mkdir -p out/fuzz-corpus/fountain_metadata out/fuzz-corpus/fountain_state
+          cp fuzz/corpus/fountain_metadata/*.bin out/fuzz-corpus/fountain_metadata/
+          cp fuzz/corpus/fountain_state/*.bin out/fuzz-corpus/fountain_state/
           ./out/fuzz/fuzz_fountain_metadata \
+            out/fuzz-corpus/fountain_metadata \
             -runs=25000 \
             -max_len=256 \
             -timeout=5 \
             -artifact_prefix=out/fuzz-artifacts/
           ./out/fuzz/fuzz_fountain_state \
+            out/fuzz-corpus/fountain_state \
             -runs=10000 \
             -max_len=512 \
             -rss_limit_mb=256 \

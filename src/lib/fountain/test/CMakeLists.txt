@@ -6,6 +6,7 @@ set (SOURCES
 	test.cpp
 	FountainEncodingTest.cpp
 	FountainMetadataTest.cpp
+	concurrent_fountain_decoder_sinkTest.cpp
 	fountain_sinkTest.cpp
 	fountain_sinkSpecialTest.cpp
 	fountain_streamTest.cpp
@@ -24,10 +25,30 @@ add_executable (
 
 add_test(fountain_test fountain_test)
 
+add_executable(
+	fountain_init_concurrency_test
+	FountainInitConcurrencyTest.cpp
+	FountainInitConcurrencyPeer.cpp
+)
+
+add_test(fountain_init_concurrency_test fountain_init_concurrency_test)
+
+target_compile_definitions(fountain_test PRIVATE
+	CIMBAR_ENABLE_SESSION_TEST_FAULTS=1
+)
+
+find_package(Threads REQUIRED)
+
 target_link_libraries(fountain_test
 	wirehair
 	zstd
+	Threads::Threads
 
 	${CPPFILESYSTEM}
+)
+
+target_link_libraries(fountain_init_concurrency_test
+	wirehair
+	Threads::Threads
 )
 

@@ -4,7 +4,10 @@
 #include "wirehair/wirehair.h"
 
 namespace FountainInit {
-	static bool init()
+	// An inline function's local static is shared across translation units.
+	// Internal linkage here would create one guard per translation unit and
+	// allow concurrent calls into Wirehair's process-global initializer.
+	inline bool init()
 	{
 		static WirehairResult res = wirehair_init();
 		return !res;
