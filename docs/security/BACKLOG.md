@@ -209,13 +209,29 @@ decoder output. WP-11 is complete for the Linux prototype.
 **Priority:** P1  
 **Dependencies:** WP-07
 
-- [ ] Define fixed message types.
-- [ ] Define version and transfer generation.
-- [ ] Define maximum IPC message and object sizes.
-- [ ] Prohibit pointers, filenames, nested objects, and arbitrary diagnostics.
-- [ ] Fuzz the IPC parser independently.
+- [x] Define fixed message types.
+- [x] Define version and transfer generation.
+- [x] Define maximum IPC message and object sizes.
+- [x] Prohibit pointers, filenames, nested objects, and arbitrary diagnostics.
+- [x] Fuzz the IPC parser independently.
 
-**Exit:** IPC is smaller and easier to audit than the optical protocol.
+**Progress:** `HardenedTransportIpc` now parses one fixed 24-byte little-endian
+`LCIP` envelope with exact version 1, a fixed message type, zero reserved flags,
+nonzero Secure-Core-selected transfer generation, exact payload length, and a
+fixed status code. Only `submit_frame` and `completed_object` may carry opaque
+payloads, and caller-selected limits bound the full envelope, corrected-frame
+payload, and completed-object payload before routing. Control, status, and
+failure messages reject payload bytes, so the IPC format has no pointer,
+filename, path, nested object, application command, wallet instruction, MIME
+type, or arbitrary diagnostic field. The contract is recorded in
+docs/security/HARDENED_IPC.md, unit-tested in the hardened transport profile,
+and fuzzed independently by `fuzz_hardened_ipc` with deterministic valid and
+fail-closed seeds under `fuzz/corpus/hardened_ipc/`. Validation evidence is
+recorded in docs/security/evidence/2026-07-23-hardened-ipc-parser.md.
+
+**Exit:** IPC is smaller and easier to audit than the optical protocol. WP-12
+is complete for the fixed parser and fuzzed envelope contract; production
+OIP/SCP service integration remains follow-up work.
 
 ## WP-13: Adversarial optical laboratory
 

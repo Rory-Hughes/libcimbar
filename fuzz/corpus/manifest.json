@@ -272,6 +272,76 @@
       "sha256": "bee861a770718910331779a62f184569fb5fd45293212601b0cb879a7f8df9a9",
       "size": 27,
       "target": "frame_sequence"
+    },
+    {
+      "description": "Valid OIP submit-frame message with one generation-scoped opaque payload.",
+      "filename": "valid-submit-frame.bin",
+      "sha256": "5acbb70d6ace95011d2317d3c719d40238be44824367372f163dde1ad82c4e38",
+      "size": 39,
+      "target": "hardened_ipc"
+    },
+    {
+      "description": "Valid decoder-to-SCP completed-object message carrying exact opaque bytes.",
+      "filename": "valid-completed-object.bin",
+      "sha256": "b3f2f073b675e85238200a509d14b61cea2a4cb31fd62e827dfcdc342d4507a6",
+      "size": 42,
+      "target": "hardened_ipc"
+    },
+    {
+      "description": "Valid zero-payload reset message scoped to a nonzero transfer generation.",
+      "filename": "valid-reset.bin",
+      "sha256": "ae9899eefbbafe3eec054d244660744826f8d994e0deab57b11a75ea9451e188",
+      "size": 24,
+      "target": "hardened_ipc"
+    },
+    {
+      "description": "Valid fixed-code status message without arbitrary diagnostics.",
+      "filename": "valid-status.bin",
+      "sha256": "304f1f4a066a694caf3969004c4ff3ec0a362564ad8900847421586e29956375",
+      "size": 24,
+      "target": "hardened_ipc"
+    },
+    {
+      "description": "Valid fixed-code failure message without a diagnostic payload.",
+      "filename": "valid-failure.bin",
+      "sha256": "25597ad8a4edf2ee10c624fb9effb46105398d0cbb4bb2f76be8639b7d73cea1",
+      "size": 24,
+      "target": "hardened_ipc"
+    },
+    {
+      "description": "Generation zero is reserved and must be rejected before routing.",
+      "filename": "zero-generation.bin",
+      "sha256": "d4937897cfb9d5e2c432e75b0809a14ccd7f2882b23d94fb54b2d1b175acfb80",
+      "size": 29,
+      "target": "hardened_ipc"
+    },
+    {
+      "description": "Control messages must reject nested or diagnostic payload bytes.",
+      "filename": "payload-on-control.bin",
+      "sha256": "3b4388184402c4a2956b458b90729ef82bd77658a486c1e1de01ea688a1757f0",
+      "size": 30,
+      "target": "hardened_ipc"
+    },
+    {
+      "description": "Unsupported IPC versions fail closed.",
+      "filename": "unknown-version.bin",
+      "sha256": "124ee76e20d83a34858434165eeb4f716109f5ed7a2c265c0e59685b76cab372",
+      "size": 29,
+      "target": "hardened_ipc"
+    },
+    {
+      "description": "Reserved flag bits fail closed until explicitly specified.",
+      "filename": "reserved-flags.bin",
+      "sha256": "22ffed4d5af2defef19d119e1b4e0d80b4f8b0fc6d625be14411074ec3d84f3c",
+      "size": 29,
+      "target": "hardened_ipc"
+    },
+    {
+      "description": "Failure messages reject arbitrary diagnostics, filenames, and other payload strings.",
+      "filename": "failure-with-diagnostics.bin",
+      "sha256": "156f003f4398c67b7f8d7a40c6aae34f93bca4559b77f40c026bb4b3b440b538",
+      "size": 36,
+      "target": "hardened_ipc"
     }
   ],
   "schema_version": 1

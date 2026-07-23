@@ -24,6 +24,17 @@ FRAME_SEQUENCE_OP_RESET = 6
 FRAME_SEQUENCE_OP_BATCH_NEXT = 7
 FRAME_SEQUENCE_OP_COMPLETE = 8
 FRAME_SEQUENCE_OP_TAKE_CHECK = 9
+IPC_TYPE_SUBMIT_FRAME = 1
+IPC_TYPE_CANCEL_TRANSFER = 2
+IPC_TYPE_RESET_TRANSFER = 3
+IPC_TYPE_COMPLETED_OBJECT = 4
+IPC_TYPE_TRANSFER_STATUS = 5
+IPC_TYPE_TRANSFER_FAILED = 6
+IPC_STATUS_OK = 0
+IPC_STATUS_RECEIVING = 1
+IPC_STATUS_COMPLETED = 2
+IPC_STATUS_INVALID_FRAME = -2
+IPC_STATUS_SANDBOX_VIOLATION = -4
 
 
 @dataclass(frozen=True)
@@ -100,6 +111,25 @@ def frame_sequence_case(
         + bytes((len(source_seed) - 1,))
         + source_seed
         + operations
+    )
+
+
+def hardened_ipc_message(
+    message_type: int,
+    generation: int,
+    status_code: int,
+    payload: bytes = b"",
+    version: int = 1,
+    flags: int = 0,
+) -> bytes:
+    return (
+        b"LCIP"
+        + bytes((version & 0xFF, message_type & 0xFF))
+        + struct.pack("<H", flags & 0xFFFF)
+        + struct.pack("<Q", generation & 0xFFFFFFFFFFFFFFFF)
+        + struct.pack("<I", len(payload))
+        + struct.pack("<i", status_code)
+        + payload
     )
 
 
@@ -247,6 +277,66 @@ CASES = (
             ),
         ),
         "Batched packets complete once, reset clears terminal state, and replay completes exactly again.",
+    ),
+    CorpusCase(
+        "hardened_ipc",
+        "valid-submit-frame.bin",
+        hardened_ipc_message(IPC_TYPE_SUBMIT_FRAME, 1, IPC_STATUS_OK, b"corrected-frame"),
+        "Valid OIP submit-frame message with one generation-scoped opaque payload.",
+    ),
+    CorpusCase(
+        "hardened_ipc",
+        "valid-completed-object.bin",
+        hardened_ipc_message(IPC_TYPE_COMPLETED_OBJECT, 2, IPC_STATUS_OK, b"secure-core-object"),
+        "Valid decoder-to-SCP completed-object message carrying exact opaque bytes.",
+    ),
+    CorpusCase(
+        "hardened_ipc",
+        "valid-reset.bin",
+        hardened_ipc_message(IPC_TYPE_RESET_TRANSFER, 3, IPC_STATUS_OK),
+        "Valid zero-payload reset message scoped to a nonzero transfer generation.",
+    ),
+    CorpusCase(
+        "hardened_ipc",
+        "valid-status.bin",
+        hardened_ipc_message(IPC_TYPE_TRANSFER_STATUS, 4, IPC_STATUS_RECEIVING),
+        "Valid fixed-code status message without arbitrary diagnostics.",
+    ),
+    CorpusCase(
+        "hardened_ipc",
+        "valid-failure.bin",
+        hardened_ipc_message(IPC_TYPE_TRANSFER_FAILED, 5, IPC_STATUS_SANDBOX_VIOLATION),
+        "Valid fixed-code failure message without a diagnostic payload.",
+    ),
+    CorpusCase(
+        "hardened_ipc",
+        "zero-generation.bin",
+        hardened_ipc_message(IPC_TYPE_SUBMIT_FRAME, 0, IPC_STATUS_OK, b"frame"),
+        "Generation zero is reserved and must be rejected before routing.",
+    ),
+    CorpusCase(
+        "hardened_ipc",
+        "payload-on-control.bin",
+        hardened_ipc_message(IPC_TYPE_CANCEL_TRANSFER, 6, IPC_STATUS_OK, b"nested"),
+        "Control messages must reject nested or diagnostic payload bytes.",
+    ),
+    CorpusCase(
+        "hardened_ipc",
+        "unknown-version.bin",
+        hardened_ipc_message(IPC_TYPE_SUBMIT_FRAME, 7, IPC_STATUS_OK, b"frame", version=2),
+        "Unsupported IPC versions fail closed.",
+    ),
+    CorpusCase(
+        "hardened_ipc",
+        "reserved-flags.bin",
+        hardened_ipc_message(IPC_TYPE_SUBMIT_FRAME, 8, IPC_STATUS_OK, b"frame", flags=1),
+        "Reserved flag bits fail closed until explicitly specified.",
+    ),
+    CorpusCase(
+        "hardened_ipc",
+        "failure-with-diagnostics.bin",
+        hardened_ipc_message(IPC_TYPE_TRANSFER_FAILED, 9, IPC_STATUS_INVALID_FRAME, b"bad filename"),
+        "Failure messages reject arbitrary diagnostics, filenames, and other payload strings.",
     ),
 )
 

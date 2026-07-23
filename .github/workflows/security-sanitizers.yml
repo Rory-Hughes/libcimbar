@@ -177,10 +177,11 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: |
           mkdir -p out/fuzz-artifacts
-          mkdir -p out/fuzz-corpus/fountain_metadata out/fuzz-corpus/fountain_state out/fuzz-corpus/frame_sequence
+          mkdir -p out/fuzz-corpus/fountain_metadata out/fuzz-corpus/fountain_state out/fuzz-corpus/frame_sequence out/fuzz-corpus/hardened_ipc
           cp fuzz/corpus/fountain_metadata/*.bin out/fuzz-corpus/fountain_metadata/
           cp fuzz/corpus/fountain_state/*.bin out/fuzz-corpus/fountain_state/
           cp fuzz/corpus/frame_sequence/*.bin out/fuzz-corpus/frame_sequence/
+          cp fuzz/corpus/hardened_ipc/*.bin out/fuzz-corpus/hardened_ipc/
           ./out/fuzz/fuzz_fountain_metadata \
             out/fuzz-corpus/fountain_metadata \
             -runs=25000 \
@@ -192,6 +193,13 @@ jobs:
             -runs=10000 \
             -max_len=512 \
             -rss_limit_mb=256 \
+            -timeout=5 \
+            -artifact_prefix=out/fuzz-artifacts/
+          ./out/fuzz/fuzz_hardened_ipc \
+            out/fuzz-corpus/hardened_ipc \
+            -runs=10000 \
+            -max_len=512 \
+            -rss_limit_mb=128 \
             -timeout=5 \
             -artifact_prefix=out/fuzz-artifacts/
           ./out/fuzz/fuzz_frame_sequence \

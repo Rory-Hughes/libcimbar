@@ -79,6 +79,16 @@ target_include_directories(fuzz_frame_sequence PRIVATE
 )
 target_link_libraries(fuzz_frame_sequence PRIVATE wirehair)
 
+add_libcimbar_fuzzer(
+    fuzz_hardened_ipc
+    fuzz_hardened_ipc.cpp
+    "${LIBCIMBAR_ROOT}/src/profile/hardened_transport/HardenedTransportIpc.cpp"
+)
+
+target_include_directories(fuzz_hardened_ipc PRIVATE
+    "${LIBCIMBAR_ROOT}/src/profile/hardened_transport"
+)
+
 option(LIBCIMBAR_FUZZ_RAW_FRAME "Build the OpenCV-backed raw-frame geometry fuzzer" ON)
 
 if(LIBCIMBAR_FUZZ_RAW_FRAME)

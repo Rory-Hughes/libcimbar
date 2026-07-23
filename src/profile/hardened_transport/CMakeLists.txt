@@ -9,6 +9,8 @@ option(
 add_library(cimbar_hardened_transport STATIC
 	HardenedFountainTransport.cpp
 	HardenedFountainTransport.h
+	HardenedTransportIpc.cpp
+	HardenedTransportIpc.h
 )
 
 target_include_directories(cimbar_hardened_transport PUBLIC

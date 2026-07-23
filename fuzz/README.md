@@ -10,6 +10,8 @@ This directory contains security-focused fuzzing scaffolding for the hardened li
 
 `fuzz_frame_sequence` starts from a bounded source object, encodes canonical fountain packets, and then submits adversarial frame sequences through the restricted `fountain_decoder_session`. The schedule supports in-order completion, reordering, dropping, duplication, batching, transfer-delay expiry, reset/replay, and rejected packet-envelope mutation. Any completed object must match the original source bytes exactly, completion may happen at most once before reset, and reset must return the session to a clean receiving state.
 
+`fuzz_hardened_ipc` exercises the fixed OIP-to-SCP IPC envelope parser independently from the optical and Wirehair decoders. It covers version, type, reserved flags, transfer generation, payload length, fixed status codes, and payload admission rules. Valid payload bytes are exposed only as an offset and length; control, status, and failure messages cannot carry nested objects, filenames, pointers, or arbitrary diagnostics.
+
 `fuzz_raw_frame` exercises the checked receive ABI, raw RGB/RGBA/NV12/I420 size validation, OpenCV conversion, scanner edge probing, midpoint geometry, and perspective deskew rejection. It caps generated fuzz frames at 96 x 96 pixels, while still sending malformed dimensions, unsupported formats, mismatched byte lengths, null input, degenerate corners, NaN, infinity, and extreme line coordinates through the same validation boundaries.
 
 Build locally with a recent Clang and CMake:
@@ -18,13 +20,15 @@ Build locally with a recent Clang and CMake:
 cmake -S fuzz -B out/fuzz -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 cmake --build out/fuzz
 python3 fuzz/corpus/generate.py --check
-mkdir -p out/fuzz-corpus/fountain_metadata out/fuzz-corpus/fountain_state out/fuzz-corpus/frame_sequence
+mkdir -p out/fuzz-corpus/fountain_metadata out/fuzz-corpus/fountain_state out/fuzz-corpus/frame_sequence out/fuzz-corpus/hardened_ipc
 cp fuzz/corpus/fountain_metadata/*.bin out/fuzz-corpus/fountain_metadata/
 cp fuzz/corpus/fountain_state/*.bin out/fuzz-corpus/fountain_state/
 cp fuzz/corpus/frame_sequence/*.bin out/fuzz-corpus/frame_sequence/
+cp fuzz/corpus/hardened_ipc/*.bin out/fuzz-corpus/hardened_ipc/
 ./out/fuzz/fuzz_fountain_metadata out/fuzz-corpus/fountain_metadata -runs=100000
 ./out/fuzz/fuzz_fountain_state out/fuzz-corpus/fountain_state -runs=10000 -max_len=512
 ./out/fuzz/fuzz_frame_sequence out/fuzz-corpus/frame_sequence -runs=5000 -max_len=1024 -rss_limit_mb=256 -timeout=5
+./out/fuzz/fuzz_hardened_ipc out/fuzz-corpus/hardened_ipc -runs=10000 -max_len=512 -rss_limit_mb=128 -timeout=5
 mkdir -p out/fuzz-corpus/raw_frame
 cp fuzz/corpus/raw_frame/*.bin out/fuzz-corpus/raw_frame/
 ./out/fuzz/fuzz_raw_frame out/fuzz-corpus/raw_frame -runs=1000 -max_len=4096 -timeout=2
@@ -78,6 +82,7 @@ fuzz/corpus/fountain_state/
 fuzz/corpus/raw_frame/
 fuzz/corpus/corrected_payload/
 fuzz/corpus/frame_sequence/
+fuzz/corpus/hardened_ipc/
 ```
 
 The metadata corpus covers empty and truncated headers, ordinary values,
@@ -92,6 +97,9 @@ subsampled dimensions, null-input selection, unsupported formats, and
 non-finite or degenerate geometry seeds. The frame-sequence corpus covers
 canonical completion, reordering, duplicate replay, dropping with delay expiry,
 mutated packet envelopes, batched frames, and explicit reset/replay.
+The hardened IPC corpus covers valid submit, completed-object, reset, status,
+and failure messages plus zero-generation, payload-on-control, unsupported
+version, reserved-flag, and failure-diagnostic rejection paths.
 
 Do not publicly commit a crash input that exposes an undisclosed exploitable vulnerability. Store private reproducers in the coordinated finding process described in `SECURITY.md`.
 

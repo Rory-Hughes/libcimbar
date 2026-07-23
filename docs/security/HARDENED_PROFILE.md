@@ -212,8 +212,30 @@ for parent-secret file reads/writes, sockets, fork, exec, and uid 0 regain must
 all fail.
 
 This is the WP-11 process-isolation baseline for the future Secure Core split.
-The final service still needs the fixed IPC contract, parser fuzzing, and
-Secure Core authentication described in WP-12.
+The final service still needs production integration of the WP-12 IPC contract
+and Secure Core authentication.
+
+### OIP-to-SCP IPC contract
+
+`HardenedTransportIpc` defines the fixed WP-12 byte envelope between the
+optical ingress process, the sandboxed decoder boundary, and the Secure Core
+process. The parser accepts exactly one 24-byte little-endian header plus an
+optional opaque payload. Version, type, transfer generation, payload length,
+and fixed status code are explicit fields. Generation zero, reserved flags,
+unknown types, unknown status codes, length mismatches, and over-limit payloads
+fail closed before routing.
+
+Only `submit_frame` and `completed_object` may carry payload bytes.
+`cancel_transfer`, `reset_transfer`, `transfer_status`, and `transfer_failed`
+must have zero payload. Status and failure reports carry fixed numeric codes
+only; there is no pointer, filename, path, nested object, text diagnostic, or
+application command field in the IPC format. The parser allocates no memory and
+returns valid payloads only as an offset and length into the caller-owned input.
+
+The independent `fuzz_hardened_ipc` target and deterministic
+`fuzz/corpus/hardened_ipc/` seeds exercise the parser without OpenCV,
+Reed-Solomon, Wirehair, filesystem, zstd, or sandbox dependencies. The detailed
+contract is recorded in `docs/security/HARDENED_IPC.md`.
 
 ## Authentication boundary
 
