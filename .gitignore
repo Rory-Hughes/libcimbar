@@ -17,6 +17,7 @@ cmake_install.cmake
 # Out-of-tree builds used by security presets and fuzzing.
 out/
 compile_commands.json
+graphify-out/
 
 # Coverage and fuzzing artifacts. Regression corpus entries should be added
 # intentionally under fuzz/corpus/ after review.
