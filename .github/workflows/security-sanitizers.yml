@@ -120,6 +120,34 @@ jobs:
       - name: Test hardened transport profile
         run: ctest --preset memory-sanitizer
 
+  hardened-transport:
+    name: Hardened transport sandbox
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            clang \
+            cmake \
+            ninja-build
+
+      - name: Configure hardened transport
+        run: cmake --preset hardened-transport
+
+      - name: Build hardened transport
+        run: cmake --build --preset hardened-transport
+
+      - name: Test hardened transport sandbox
+        run: ctest --preset hardened-transport
+
   fuzz-smoke:
     name: Metadata fuzzer smoke test
     runs-on: ubuntu-24.04
@@ -149,9 +177,10 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: |
           mkdir -p out/fuzz-artifacts
-          mkdir -p out/fuzz-corpus/fountain_metadata out/fuzz-corpus/fountain_state
+          mkdir -p out/fuzz-corpus/fountain_metadata out/fuzz-corpus/fountain_state out/fuzz-corpus/frame_sequence
           cp fuzz/corpus/fountain_metadata/*.bin out/fuzz-corpus/fountain_metadata/
           cp fuzz/corpus/fountain_state/*.bin out/fuzz-corpus/fountain_state/
+          cp fuzz/corpus/frame_sequence/*.bin out/fuzz-corpus/frame_sequence/
           ./out/fuzz/fuzz_fountain_metadata \
             out/fuzz-corpus/fountain_metadata \
             -runs=25000 \
@@ -162,6 +191,13 @@ jobs:
             out/fuzz-corpus/fountain_state \
             -runs=10000 \
             -max_len=512 \
+            -rss_limit_mb=256 \
+            -timeout=5 \
+            -artifact_prefix=out/fuzz-artifacts/
+          ./out/fuzz/fuzz_frame_sequence \
+            out/fuzz-corpus/frame_sequence \
+            -runs=5000 \
+            -max_len=1024 \
             -rss_limit_mb=256 \
             -timeout=5 \
             -artifact_prefix=out/fuzz-artifacts/

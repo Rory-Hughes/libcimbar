@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
 
+option(
+	LIBCIMBAR_BUILD_LINUX_SANDBOX_PROTOTYPE
+	"Build the Linux seccomp/process sandbox prototype for the hardened transport"
+	OFF
+)
+
 add_library(cimbar_hardened_transport STATIC
 	HardenedFountainTransport.cpp
 	HardenedFountainTransport.h
@@ -60,6 +66,35 @@ if(NOT DEFINED DISABLE_TESTS)
 		VERBATIM
 	)
 
+	if(LIBCIMBAR_BUILD_LINUX_SANDBOX_PROTOTYPE)
+		if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+			add_executable(hardened_transport_sandbox_probe
+				test/LinuxSandboxProbe.cpp
+			)
+			target_link_libraries(hardened_transport_sandbox_probe
+				cimbar_hardened_transport
+			)
+			add_test(
+				NAME hardened_transport_sandbox_probe
+				COMMAND hardened_transport_sandbox_probe
+			)
+		else()
+			message(WARNING
+				"LIBCIMBAR_BUILD_LINUX_SANDBOX_PROTOTYPE is enabled, but the "
+				"prototype currently supports only Linux x86_64; skipping target"
+			)
+		endif()
+	endif()
+
+	set(HARDENED_TRANSPORT_VERIFY_DEPENDS
+		cimbar_hardened_transport
+		hardened_transport_profile_test
+		${HARDENED_ARTIFACT_VERIFIER}
+	)
+	if(TARGET hardened_transport_sandbox_probe)
+		list(APPEND HARDENED_TRANSPORT_VERIFY_DEPENDS hardened_transport_sandbox_probe)
+	endif()
+
 	add_custom_target(verify_hardened_transport ALL
 		COMMAND ${CMAKE_COMMAND}
 			-DARTIFACT=$<TARGET_FILE:cimbar_hardened_transport>
@@ -72,9 +107,7 @@ if(NOT DEFINED DISABLE_TESTS)
 			-DSTRINGS_TOOL=${LIBCIMBAR_STRINGS_TOOL}
 			-P ${HARDENED_ARTIFACT_VERIFIER}
 		DEPENDS
-			cimbar_hardened_transport
-			hardened_transport_profile_test
-			${HARDENED_ARTIFACT_VERIFIER}
+			${HARDENED_TRANSPORT_VERIFY_DEPENDS}
 		VERBATIM
 	)
 else()
