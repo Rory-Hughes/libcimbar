@@ -193,6 +193,28 @@ The decoder process or processor domain must have:
 - A watchdog.
 - Process restart after each transfer where practical.
 
+### Linux sandbox prototype
+
+The `hardened-transport` preset now enables the opt-in
+`LIBCIMBAR_BUILD_LINUX_SANDBOX_PROTOTYPE` target on Linux x86_64. The
+`hardened_transport_sandbox_probe` executable is not linked into
+`cimbar_hardened_transport`; it is a deployment prototype that exercises the
+same corrected-packet `HardenedFountainTransport` boundary in a restricted
+child process.
+
+For each transfer, the parent forks a new child and enforces a watchdog. The
+child drops root to uid/gid 65534 when needed, verifies non-root execution and
+zero effective capabilities, sets `no_new_privs`, disables core dumps, applies
+memory, CPU, process-count, file-size, core, and descriptor limits, attempts
+network namespace isolation where permitted, and installs a seccomp-BPF
+allowlist before decoding. After exact reconstruction, deliberate escape probes
+for parent-secret file reads/writes, sockets, fork, exec, and uid 0 regain must
+all fail.
+
+This is the WP-11 process-isolation baseline for the future Secure Core split.
+The final service still needs the fixed IPC contract, parser fuzzing, and
+Secure Core authentication described in WP-12.
+
 ## Authentication boundary
 
 The Secure Core must copy the completed bytes into its own bounded memory, parse the outer envelope, authenticate the object, and only then parse application content. Cimbar reconstruction alone never authorizes an action.

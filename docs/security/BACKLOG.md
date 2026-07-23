@@ -24,12 +24,13 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 **Dependencies:** WP-01
 
 - [x] Record direct local system dependency versions in docs/security/DEPENDENCY_INVENTORY.md.
-- [ ] Identify immutable upstream revisions for every vendored library.
+- [x] Identify immutable upstream revisions for every vendored library.
 - [x] Record declared licences and explicitly identify missing provenance.
 - [x] Generate an initial SPDX SBOM with deterministic vendored-source fingerprints.
-- [ ] Establish vulnerability monitoring for OpenCV, Wirehair, zstd, libcorrect, stb, and other reachable dependencies.
+- [x] Establish vulnerability monitoring for OpenCV, Wirehair, zstd, libcorrect, stb, and other reachable dependencies.
+- [x] Remove OpenCV decoding from production file-input paths and enforce reviewed, expiring exceptions for the seven remaining package-level findings.
 
-**Exit:** Every shipped dependency has source, version, licence, and update owner. The initial inventory is not yet release-complete because external dependencies are not locked and several vendored revisions remain unknown.
+**Exit:** Every direct dependency has an immutable source revision, version evidence, licence, update owner, and automated commit-level advisory monitoring. The pinned Windows vcpkg baseline fixes the external dependency graph, and CI couples the OSV lock to the source-digested SPDX catalog. The hardened transport config has no image-stack dependency. Production file inputs use bounded stb_image rather than OpenCV decoding; the exact OpenCV exception set expires on 2026-10-22 and fails if vulnerable calls return. A release-complete transitive SBOM and Linux package lock are separate release-engineering follow-up. WP-02 is complete.
 
 ## WP-03: Establish sanitizer and static-analysis baselines
 
@@ -126,40 +127,82 @@ GitHub Issues were disabled when this backlog was initialized. Move these work p
 **Priority:** P1  
 **Dependencies:** WP-03, WP-04
 
-- [ ] Define supported raw frame formats and dimensions.
-- [ ] Build a constrained raw-frame fuzz input.
-- [ ] Seed with valid, cropped, rotated, noisy, overexposed, and damaged frames.
-- [ ] Exercise empty matrices, invalid ROI, singular transforms, NaN, infinity, and extreme coordinates.
-- [ ] Measure worst-case per-frame CPU.
+- [x] Define supported raw frame formats and dimensions.
+- [x] Build a constrained raw-frame fuzz input.
+- [x] Seed with valid, cropped, rotated, noisy, overexposed, and damaged frames.
+- [x] Exercise empty matrices, invalid ROI, singular transforms, NaN, infinity, and extreme coordinates.
+- [x] Measure worst-case per-frame CPU.
 
-**Exit:** Malformed frames fail within the per-frame resource budget.
+**Progress:** `fuzz_raw_frame` now covers the length-aware receive ABI, the
+four accepted tight raw formats, malformed dimensions and byte lengths, scanner
+edge probing, non-finite line geometry, and degenerate deskew transforms. The
+target caps generated fuzz frames at 96 x 96 pixels; the public checked API
+still accepts RGB, RGBA, NV12, and I420 up to the 4096 x 4096 pixel ceiling.
+`cimbar_raw_frame_cpu_budget` runs five full-size hostile RGB patterns through
+the checked ABI with OpenCV restricted to one CPU thread and fails when the
+largest of three samples per pattern exceeds 250 ms. Scanner confirmation
+working sets are capped at 64 candidates per stage before the nested scan
+operations. On the reference WSL release build, the highest observed call was
+106.962 ms at the public 4096 x 4096 limit. The evidence records the exact
+toolchain, command, and individual pattern results.
+
+**Exit:** Malformed frames fail within the 250 ms per-frame resource budget on
+the reference single-threaded OpenCV environment. WP-09 is complete.
 
 ## WP-10: End-to-end frame-sequence fuzzer
 
 **Priority:** P1  
 **Dependencies:** WP-05, WP-09
 
-- [ ] Encode structured frame sequences.
-- [ ] Support reordering, dropping, duplication, delay, and mutation.
-- [ ] Assert exact source bytes or no output.
-- [ ] Assert single completion and clean reset.
+- [x] Encode structured frame sequences.
+- [x] Support reordering, dropping, duplication, delay, and mutation.
+- [x] Assert exact source bytes or no output.
+- [x] Assert single completion and clean reset.
 
-**Exit:** No mixed or partial object is emitted under adversarial sequencing.
+**Progress:** `fuzz_frame_sequence` now creates bounded source objects, encodes
+canonical Wirehair fountain packets, and drives them through the restricted
+`fountain_decoder_session` rather than the generic callback/file sink. The
+schedule grammar covers in-order completion, selected reordering, dropped
+packets, duplicate replay, batched packet frames, transfer-delay expiry,
+explicit reset/replay, and rejected packet-envelope mutations. On every
+positive completion the harness takes the single session-owned object and
+asserts exact byte equality with the generated source; any second completion
+before reset or any object visible on a non-completion path traps. Deterministic
+seeds cover the reviewed valid, reordered, duplicate, dropped/delayed,
+mutated-envelope, batched, and reset/replay paths.
+
+**Exit:** No mixed or partial object is emitted under adversarial sequencing in
+the WP-10 sanitizer smoke campaign. WP-10 is complete.
 
 ## WP-11: Decoder sandbox prototype
 
 **Priority:** P1  
 **Dependencies:** WP-07
 
-- [ ] Run decoder as non-root.
-- [ ] Remove network access and capabilities.
-- [ ] Apply read-only filesystem or no filesystem.
-- [ ] Add seccomp allowlist.
-- [ ] Add memory, CPU, process, and descriptor limits.
-- [ ] Add watchdog and per-transfer restart.
-- [ ] Attempt boundary escape from a deliberately compromised decoder.
+- [x] Run decoder as non-root.
+- [x] Remove network access and capabilities.
+- [x] Apply read-only filesystem or no filesystem.
+- [x] Add seccomp allowlist.
+- [x] Add memory, CPU, process, and descriptor limits.
+- [x] Add watchdog and per-transfer restart.
+- [x] Attempt boundary escape from a deliberately compromised decoder.
 
-**Exit:** Decoder compromise cannot directly access secrets, network, arbitrary files, or secure-core memory.
+**Progress:** The hardened transport preset can now build a Linux x86_64
+`hardened_transport_sandbox_probe` when
+`LIBCIMBAR_BUILD_LINUX_SANDBOX_PROTOTYPE=ON`. The probe forks one child per
+transfer, drops root to uid/gid 65534 when needed, verifies a non-root identity
+with no effective capabilities, sets `no_new_privs`, applies memory, CPU,
+process, descriptor, file-size, and core limits, and installs a seccomp-BPF
+allowlist before decoding. The allowlist admits only basic exit, signal, memory,
+time, identity, futex, read, write, and close syscalls needed by the
+corrected-packet hardened transport. Open/read, open/write, socket, fork, exec,
+and setuid escape probes are all denied after an exact-byte decode. A parent
+watchdog kills a stuck child and each transfer runs in a new process.
+
+**Exit:** A deliberately compromised sandbox child cannot directly read or
+write the parent-created secret file, create a socket, fork another process,
+exec a program, regain uid 0, retain effective capabilities, or expose partial
+decoder output. WP-11 is complete for the Linux prototype.
 
 ## WP-12: OIP-to-SCP IPC specification
 
