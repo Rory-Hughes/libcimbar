@@ -132,6 +132,146 @@
       "sha256": "e490734295bdcd071cf2b425075125c0ea2192aedbdf69fed7202f7b32119fd0",
       "size": 72,
       "target": "fountain_state"
+    },
+    {
+      "description": "Valid tightly packed RGB envelope with generated gradient pixels.",
+      "filename": "valid-rgb.bin",
+      "sha256": "b8c47a34cddd394e6287404b755a8788156c57686f12be5caa2f28292ac384ff",
+      "size": 68,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Valid RGBA envelope exercising alpha-stripping conversion.",
+      "filename": "valid-rgba.bin",
+      "sha256": "d7c01e7367ea21a72cc125e469735f544bb26b0747e9995ce6213aadb5a5e66b",
+      "size": 68,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Valid even-dimension NV12 envelope exercising YUV conversion.",
+      "filename": "valid-nv12.bin",
+      "sha256": "884ead1e5bfc4082e5492ce067c9cb11f5955dc3e062ba25fa6a5e7f553a1227",
+      "size": 68,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Valid even-dimension I420 envelope exercising planar YUV conversion.",
+      "filename": "valid-i420.bin",
+      "sha256": "d7122544a025c056d02fe94f3d3fdd9b8e564c6f2ffb3ed75782f32072c2ee28",
+      "size": 68,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Small cropped-looking checker pattern through RGB geometry scanning.",
+      "filename": "cropped-pattern.bin",
+      "sha256": "f0aa080c72a32e648fa1f58e985199f452c4d81b609a8eef46ecb40e7d08ed60",
+      "size": 8,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Non-square rotated-looking gradient pattern through scanner and deskew paths.",
+      "filename": "rotated-pattern.bin",
+      "sha256": "be252b04f516bfada7f6a51b4641f1ddc4a21177fe3d5e5b53f29c33707f8e20",
+      "size": 36,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Noisy generated RGB frame for scanner candidate stress.",
+      "filename": "noisy-frame.bin",
+      "sha256": "59d0372140f7dc03e0b8b376fb25cd55525d1dad5201bfe9c512ac556a469ddd",
+      "size": 260,
+      "target": "raw_frame"
+    },
+    {
+      "description": "All-white overexposed frame that should fail extraction cheaply.",
+      "filename": "overexposed-frame.bin",
+      "sha256": "7802263a67a632271d0cf71b5e6f396c36a9c465810f550e1c65f260a17c6293",
+      "size": 5,
+      "target": "raw_frame"
+    },
+    {
+      "description": "RGB frame with one byte missing from the declared tight size.",
+      "filename": "damaged-short-buffer.bin",
+      "sha256": "c591a76a0c0bf4e5eb5d1e254d1dd676ba61c3382c491c4b25e197e3500ce088",
+      "size": 35,
+      "target": "raw_frame"
+    },
+    {
+      "description": "RGB frame with one extra byte beyond the declared tight size.",
+      "filename": "damaged-long-buffer.bin",
+      "sha256": "2e45dfeea877dc4db7a5a920d467ce2f74b0a7b6c1acc7da824ee7a1b2d4a27a",
+      "size": 35,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Odd-width NV12 envelope rejected before OpenCV conversion.",
+      "filename": "odd-nv12-dimensions.bin",
+      "sha256": "78e3c689c96a9446df37cf02dbdfe88d8c6e316a085ecd01f215f60babb1d8dc",
+      "size": 5,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Unsupported format selector rejected at the raw-frame boundary.",
+      "filename": "unsupported-format.bin",
+      "sha256": "02d203518d653c112efe4233d2a7a86e72ded5fbf8241392071d964883d064fa",
+      "size": 5,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Null-input selector must return the C ABI null-pointer error.",
+      "filename": "null-input-selection.bin",
+      "sha256": "38269a8198bbf4805def73e408b024a2a6cf0b577284a1e43c1f903588434927",
+      "size": 5,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Line-geometry seeds include NaN and infinity and must not produce finite-looking invalid midpoints.",
+      "filename": "nonfinite-geometry.bin",
+      "sha256": "1ffb9b355799c483cd644e01ad1a46cc43b0a6957551aaa39a20476ff35b4440",
+      "size": 40,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Degenerate repeated deskew corners are rejected before perspective warp.",
+      "filename": "degenerate-corners.bin",
+      "sha256": "c00d9a29f5eb006c1e5bd64c7199ef600236e6b650c2f21919ddda4b900f8c1d",
+      "size": 20,
+      "target": "raw_frame"
+    },
+    {
+      "description": "Canonical generated fountain sequence completes and recovers exact source bytes.",
+      "filename": "valid-completion.bin",
+      "sha256": "bcf2785de30c97a53f66ce99d9a8e2795c59eb466645c5b5d2dd5de05372764d",
+      "size": 25,
+      "target": "frame_sequence"
+    },
+    {
+      "description": "Out-of-order packets and duplicates still complete at most once with exact output.",
+      "filename": "reordered-duplicates.bin",
+      "sha256": "88db17bfc2487bf71e624f888695c34bf2f2a1f8e40a9357824e2fe28dfbd123",
+      "size": 29,
+      "target": "frame_sequence"
+    },
+    {
+      "description": "Dropped packets and transfer timeout leave no completed object visible.",
+      "filename": "dropped-delayed-no-output.bin",
+      "sha256": "45bddde7ae46037f29474f74f142431d0f3abf7784c3e7da3cae5aead45726b5",
+      "size": 19,
+      "target": "frame_sequence"
+    },
+    {
+      "description": "A mutated block identifier is rejected before object output.",
+      "filename": "mutated-envelope-no-output.bin",
+      "sha256": "cdd22d0e4ec4252d6112c6651124b58ac672d2505445ee64aae9591e002f6c6a",
+      "size": 25,
+      "target": "frame_sequence"
+    },
+    {
+      "description": "Batched packets complete once, reset clears terminal state, and replay completes exactly again.",
+      "filename": "batched-reset-replay.bin",
+      "sha256": "bee861a770718910331779a62f184569fb5fd45293212601b0cb879a7f8df9a9",
+      "size": 27,
+      "target": "frame_sequence"
     }
   ],
   "schema_version": 1

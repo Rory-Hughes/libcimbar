@@ -8,6 +8,7 @@
 #include "util/compiler_constants.h"
 
 #include <opencv2/opencv.hpp>
+#include <cstddef>
 #include <functional>
 #include <vector>
 
@@ -16,6 +17,10 @@ class Midpoints;
 class Scanner
 {
 public: // public inline methods
+	// Four anchors are sufficient to decode a frame. Keep malformed patterns
+	// from growing the expensive candidate-confirmation working sets.
+	static constexpr std::size_t max_candidates_per_stage = 64U;
+
 	template <typename MAT>
 	Scanner(const MAT& img, bool fast=true, bool dark=true, int skip=0);
 
@@ -148,6 +153,12 @@ inline cv::Mat Scanner::preprocess_image(const MAT& img, bool fast)
 template <typename MAT, typename MAT2>
 inline void Scanner::preprocess_image(const MAT& img, MAT2& out, bool fast)
 {
+	if (img.empty() || img.rows <= 0 || img.cols <= 0)
+	{
+		out = MAT2();
+		return;
+	}
+
 	MAT temp;
 	if (img.channels() >= 3)
 		cv::cvtColor(img, temp, cv::COLOR_RGB2GRAY);
@@ -167,8 +178,8 @@ inline void Scanner::preprocess_image(const MAT& img, MAT2& out, bool fast)
 template <typename MAT>
 inline Scanner::Scanner(const MAT& img, bool fast, bool dark, int skip)
 	: _dark(dark)
-	, _skip(skip? skip : std::min(img.rows, img.cols) / 60)
-	, _mergeCutoff(img.cols / 30)
+	, _skip(skip > 0 ? skip : std::max(1, std::min(img.rows, img.cols) / 60))
+	, _mergeCutoff(std::max(1, img.cols / 30))
 	, _anchorSize(30)
 {
 	_img = preprocess_image(img, fast);

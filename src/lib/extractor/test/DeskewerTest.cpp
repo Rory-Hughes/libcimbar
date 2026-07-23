@@ -31,4 +31,17 @@ TEST_CASE( "DeskewerTest/testPadded", "[unit]" )
 	assertEquals( 0x6e483730782fee5c, image_hash::average_hash(innerGrid) );
 }
 
+TEST_CASE( "DeskewerTest/rejectsDegenerateGeometry", "[unit]" )
+{
+	cv::Mat img(32, 32, CV_8UC3, cv::Scalar(0, 0, 0));
+
+	Deskewer de(0, {32, 32}, 4);
+	assertTrue(de.deskew(img, Corners({4, 4}, {4, 4}, {28, 28}, {28, 28})).empty());
+	assertTrue(de.deskew(img, Corners({4, 4}, {12, 12}, {20, 20}, {28, 28})).empty());
+
+	Deskewer invalid_output(0, {8, 8}, 16);
+	assertTrue(invalid_output.deskew(img, Corners({4, 4}, {28, 4}, {4, 28}, {28, 28})).empty());
+	assertTrue(de.deskew(cv::Mat(), Corners({4, 4}, {28, 4}, {4, 28}, {28, 28})).empty());
+}
+
 

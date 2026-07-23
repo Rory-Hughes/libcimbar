@@ -4,6 +4,7 @@
 #include "Corners.h"
 #include "Midpoints.h"
 #include "Point.h"
+#include <cmath>
 #include <optional>
 #include <vector>
 #include <utility>
@@ -12,8 +13,19 @@ namespace Geometry
 {
 	using floating_point = point<double>;
 
+	inline bool is_finite(const floating_point& p)
+	{
+		return std::isfinite(p.x()) && std::isfinite(p.y());
+	}
+
 	inline floating_point line_intersection(const std::pair<floating_point, floating_point>& lineA, const std::pair<floating_point, floating_point>& lineB)
 	{
+		if (!is_finite(lineA.first) || !is_finite(lineA.second) ||
+		    !is_finite(lineB.first) || !is_finite(lineB.second))
+		{
+			return floating_point::NONE();
+		}
+
 		auto compute = [] (const floating_point& p, const floating_point& q) {
 			double xdiff = q.x() - p.x();
 			double ydiff = p.y() - q.y();
@@ -25,12 +37,15 @@ namespace Geometry
 		auto [bx, by, bdet] = compute(lineB.first, lineB.second);
 
 		double D = ay * bx - ax * by;
-		if (fabs(D) < 1e-8)
+		if (!std::isfinite(D) || std::fabs(D) < 1e-8)
 		    return floating_point::NONE();
 
 		double Dx = adet * bx - ax * bdet;
 		double Dy = ay * bdet - adet * by;
-		return floating_point({Dx / D, Dy / D});
+		floating_point result({Dx / D, Dy / D});
+		if (!is_finite(result))
+			return floating_point::NONE();
+		return result;
 	}
 
 	inline Midpoints calculate_midpoints(const Corners& sq)
@@ -60,15 +75,23 @@ namespace Geometry
 
 		// there are some corner cases that need to be handled here...
 		auto tmid = line_intersection(top, vertical);
+		if (!tmid)
+			return {};
 		mids.push_back(tmid);
 
 		auto rmid = line_intersection(right, horizontal);
+		if (!rmid)
+			return {};
 		mids.push_back(rmid);
 
 		auto bmid = line_intersection(bottom, vertical);
+		if (!bmid)
+			return {};
 		mids.push_back(bmid);
 
 		auto lmid = line_intersection(left, horizontal);
+		if (!lmid)
+			return {};
 		mids.push_back(lmid);
 
 		return mids;

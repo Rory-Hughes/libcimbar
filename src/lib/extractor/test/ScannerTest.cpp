@@ -208,6 +208,22 @@ TEST_CASE( "ScannerTest/testScanEdges", "[unit]" )
 	assertEquals( "202.549,490.268 623.627,64.5719 1037.01,480.052 632.907,900.226", turbo::str::join(mp.points()) );
 }
 
+TEST_CASE( "ScannerTest/rejectsDegenerateEdgeGeometry", "[unit]" )
+{
+	cv::Mat img(8, 8, CV_8UC1, cv::Scalar(255));
+	Scanner sc(img);
+
+	Midpoints midpoints;
+	REQUIRE_NOTHROW(sc.scan_edges(Corners({0, 0}, {7, 0}, {0, 7}, {7, 7}), midpoints));
+
+	std::vector<Anchor> zero_size = {
+		Anchor(1, 1, 1, 1),
+		Anchor(6, 6, 1, 1),
+		Anchor(1, 1, 6, 6),
+	};
+	assertFalse(sc.add_bottom_right_corner(zero_size, 1));
+}
+
 TEST_CASE( "ScannerTest/testSortTopToBottom", "[unit]" )
 {
 	std::vector<Anchor> candidates;

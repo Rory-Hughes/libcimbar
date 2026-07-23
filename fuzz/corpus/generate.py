@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate and verify deterministic libcimbar fountain fuzz corpora."""
+"""Generate and verify deterministic libcimbar fuzz corpora."""
 
 from __future__ import annotations
 
@@ -14,6 +14,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PACKET_SIZE = 122
+FRAME_SEQUENCE_OP_DELIVER_NEXT = 0
+FRAME_SEQUENCE_OP_DROP_NEXT = 1
+FRAME_SEQUENCE_OP_DUPLICATE_LAST = 2
+FRAME_SEQUENCE_OP_DELIVER_SELECTED = 3
+FRAME_SEQUENCE_OP_MUTATE_SELECTED = 4
+FRAME_SEQUENCE_OP_DELAY = 5
+FRAME_SEQUENCE_OP_RESET = 6
+FRAME_SEQUENCE_OP_BATCH_NEXT = 7
+FRAME_SEQUENCE_OP_COMPLETE = 8
+FRAME_SEQUENCE_OP_TAKE_CHECK = 9
 
 
 @dataclass(frozen=True)
@@ -68,6 +78,31 @@ def raw_frame(frame: bytes) -> bytes:
     return bytes((0, len(frame) - 1)) + frame
 
 
+def raw_frame_case(control: int, width: int, height: int, size_mode: int, payload: bytes) -> bytes:
+    return bytes((control & 0xFF, width & 0xFF, height & 0xFF, size_mode & 0xFF)) + payload
+
+
+def gradient_payload(length: int, salt: int) -> bytes:
+    return bytes(((index * 37 + salt) & 0xFF) for index in range(length))
+
+
+def frame_sequence_case(
+    encode_id: int,
+    object_seed: int,
+    source_seed: bytes,
+    operations: bytes,
+) -> bytes:
+    if not 1 <= len(source_seed) <= 32:
+        raise ValueError("frame-sequence source seed must be 1..32 bytes")
+    return (
+        bytes((encode_id & 0x7F,))
+        + struct.pack("<H", object_seed & 0xFFFF)
+        + bytes((len(source_seed) - 1,))
+        + source_seed
+        + operations
+    )
+
+
 CASES = (
     CorpusCase("fountain_metadata", "empty.bin", b"", "Empty metadata input."),
     CorpusCase("fountain_metadata", "one-byte.bin", b"\x7f", "One-byte truncated header."),
@@ -97,6 +132,121 @@ CASES = (
         "completion-reuse-after-reset.bin",
         complete_transfer(6) + b"\x02\x07" + complete_transfer(6),
         "Replay is refused before reset and the encode ID may be reused only after reset.",
+    ),
+    CorpusCase("raw_frame", "valid-rgb.bin", raw_frame_case(0x10, 16, 16, 0, gradient_payload(64, 1)), "Valid tightly packed RGB envelope with generated gradient pixels."),
+    CorpusCase("raw_frame", "valid-rgba.bin", raw_frame_case(0x20, 16, 16, 0, gradient_payload(64, 2)), "Valid RGBA envelope exercising alpha-stripping conversion."),
+    CorpusCase("raw_frame", "valid-nv12.bin", raw_frame_case(0x30, 16, 16, 0, gradient_payload(64, 3)), "Valid even-dimension NV12 envelope exercising YUV conversion."),
+    CorpusCase("raw_frame", "valid-i420.bin", raw_frame_case(0x40, 16, 16, 0, gradient_payload(64, 4)), "Valid even-dimension I420 envelope exercising planar YUV conversion."),
+    CorpusCase("raw_frame", "cropped-pattern.bin", raw_frame_case(0x10, 33, 47, 0x0C, b"\x00\xff\x00\xff"), "Small cropped-looking checker pattern through RGB geometry scanning."),
+    CorpusCase("raw_frame", "rotated-pattern.bin", raw_frame_case(0x12, 61, 53, 0x08, bytes(range(32))), "Non-square rotated-looking gradient pattern through scanner and deskew paths."),
+    CorpusCase("raw_frame", "noisy-frame.bin", raw_frame_case(0x10, 64, 64, 0x10, gradient_payload(256, 99)), "Noisy generated RGB frame for scanner candidate stress."),
+    CorpusCase("raw_frame", "overexposed-frame.bin", raw_frame_case(0x10, 64, 64, 0x04, b"\xff"), "All-white overexposed frame that should fail extraction cheaply."),
+    CorpusCase("raw_frame", "damaged-short-buffer.bin", raw_frame_case(0x10, 32, 32, 0x01, gradient_payload(31, 7)), "RGB frame with one byte missing from the declared tight size."),
+    CorpusCase("raw_frame", "damaged-long-buffer.bin", raw_frame_case(0x10, 32, 32, 0x02, gradient_payload(31, 8)), "RGB frame with one extra byte beyond the declared tight size."),
+    CorpusCase("raw_frame", "odd-nv12-dimensions.bin", raw_frame_case(0x30, 17, 16, 0x00, b"\x80"), "Odd-width NV12 envelope rejected before OpenCV conversion."),
+    CorpusCase("raw_frame", "unsupported-format.bin", raw_frame_case(0x50, 16, 16, 0x00, b"\x55"), "Unsupported format selector rejected at the raw-frame boundary."),
+    CorpusCase("raw_frame", "null-input-selection.bin", raw_frame_case(0x90, 16, 16, 0x00, b"\xaa"), "Null-input selector must return the C ABI null-pointer error."),
+    CorpusCase(
+        "raw_frame",
+        "nonfinite-geometry.bin",
+        raw_frame_case(0x10, 16, 16, 0x00, b"\x00" * 4 + struct.pack("<dddd", float("nan"), float("inf"), -float("inf"), 0.0)),
+        "Line-geometry seeds include NaN and infinity and must not produce finite-looking invalid midpoints.",
+    ),
+    CorpusCase(
+        "raw_frame",
+        "degenerate-corners.bin",
+        raw_frame_case(0x10, 16, 16, 0x00, b"\x34\x12\x34\x12\x34\x12\x34\x12\x34\x12\x34\x12\x34\x12\x34\x12"),
+        "Degenerate repeated deskew corners are rejected before perspective warp.",
+    ),
+    CorpusCase(
+        "frame_sequence",
+        "valid-completion.bin",
+        frame_sequence_case(
+            8,
+            384,
+            b"valid-frame-sequence",
+            bytes((FRAME_SEQUENCE_OP_COMPLETE,)),
+        ),
+        "Canonical generated fountain sequence completes and recovers exact source bytes.",
+    ),
+    CorpusCase(
+        "frame_sequence",
+        "reordered-duplicates.bin",
+        frame_sequence_case(
+            9,
+            259,
+            b"reorder-duplicate",
+            bytes(
+                (
+                    FRAME_SEQUENCE_OP_DELIVER_SELECTED,
+                    2,
+                    FRAME_SEQUENCE_OP_DELIVER_SELECTED,
+                    0,
+                    FRAME_SEQUENCE_OP_DUPLICATE_LAST,
+                    FRAME_SEQUENCE_OP_DELIVER_SELECTED,
+                    3,
+                    FRAME_SEQUENCE_OP_COMPLETE,
+                )
+            ),
+        ),
+        "Out-of-order packets and duplicates still complete at most once with exact output.",
+    ),
+    CorpusCase(
+        "frame_sequence",
+        "dropped-delayed-no-output.bin",
+        frame_sequence_case(
+            10,
+            511,
+            b"drop-delay",
+            bytes(
+                (
+                    FRAME_SEQUENCE_OP_DELIVER_NEXT,
+                    FRAME_SEQUENCE_OP_DROP_NEXT,
+                    FRAME_SEQUENCE_OP_DELAY,
+                    FRAME_SEQUENCE_OP_DELIVER_NEXT,
+                    FRAME_SEQUENCE_OP_TAKE_CHECK,
+                )
+            ),
+        ),
+        "Dropped packets and transfer timeout leave no completed object visible.",
+    ),
+    CorpusCase(
+        "frame_sequence",
+        "mutated-envelope-no-output.bin",
+        frame_sequence_case(
+            11,
+            200,
+            b"mutated-envelope",
+            bytes(
+                (
+                    FRAME_SEQUENCE_OP_MUTATE_SELECTED,
+                    0,
+                    3,
+                    0,
+                    FRAME_SEQUENCE_OP_TAKE_CHECK,
+                )
+            ),
+        ),
+        "A mutated block identifier is rejected before object output.",
+    ),
+    CorpusCase(
+        "frame_sequence",
+        "batched-reset-replay.bin",
+        frame_sequence_case(
+            12,
+            640,
+            b"batch-reset-replay",
+            bytes(
+                (
+                    FRAME_SEQUENCE_OP_BATCH_NEXT,
+                    3,
+                    FRAME_SEQUENCE_OP_COMPLETE,
+                    FRAME_SEQUENCE_OP_RESET,
+                    FRAME_SEQUENCE_OP_COMPLETE,
+                )
+            ),
+        ),
+        "Batched packets complete once, reset clears terminal state, and replay completes exactly again.",
     ),
 )
 

@@ -33,3 +33,19 @@ target_link_libraries(cimbar_js_test
 	${OPENCV_LIBS}
 )
 
+add_executable(
+	cimbar_raw_frame_cpu_budget
+	raw_frame_cpu_budget.cpp
+)
+
+target_link_libraries(cimbar_raw_frame_cpu_budget
+	cimbar_js
+	cimb_translator
+	extractor
+
+	correct_static
+	wirehair
+	zstd
+	${OPENCV_LIBS}
+)
+
