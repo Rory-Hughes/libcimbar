@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "libcimbar",
+  "version-string": "0.0.0-hardening",
+  "builtin-baseline": "6ecbbbdf31cba47aafa7cf6189b1e73e10ac61f8",
+  "dependencies": [],
+  "default-features": [
+    "compatibility-apps"
+  ],
+  "features": {
+    "compatibility-apps": {
+      "description": "Generic image and live-camera applications outside the hardened transport profile",
+      "dependencies": [
+        "glfw3",
+        {
+          "name": "opencv4",
+          "default-features": false,
+          "features": [
+            "calib3d",
+            "jpeg",
+            "png",
+            "thread"
+          ]
+        },
+        "opengl-registry"
+      ]
+    }
+  }
+}

@@ -221,6 +221,24 @@ WIREHAIR_EXPORT WirehairCodec wirehair_decoder_create(
 );
 
 /**
+    Calculate a conservative upper bound for decoder-owned heap memory.
+
+    The result includes the codec object, input/workspace buffers, the
+    worst-case deferred Gaussian-elimination matrix, and alignment overhead.
+    It is intended for admission control before wirehair_decoder_create().
+*/
+WIREHAIR_EXPORT WirehairResult wirehair_decoder_memory_required(
+    uint64_t  messageBytes,
+    uint32_t    blockBytes,
+    uint64_t*    bytesOut
+);
+
+/** Return decoder-owned heap bytes currently allocated, or zero for null. */
+WIREHAIR_EXPORT uint64_t wirehair_decoder_memory_allocated(
+    WirehairCodec codec
+);
+
+/**
     wirehair_decode()
 
     Provide the decoder with a block from the wirehair_encode() function.

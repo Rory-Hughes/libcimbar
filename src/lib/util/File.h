@@ -92,9 +92,9 @@ public:
 	{
 		if (_fp != NULL)
 		{
-			fclose(_fp);
+			const int result = fclose(_fp);
 			_fp = NULL;
-			return true;
+			return result == 0;
 		}
 		return false;
 	}

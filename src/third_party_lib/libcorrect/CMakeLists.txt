@@ -17,7 +17,10 @@ if(COMPILER_SUPPORTS_WPEDANTIC)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpedantic")
 endif()
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g3 -O0 -fsanitize=address")
+    # Sanitizers are selected by the parent build. Forcing AddressSanitizer
+    # here makes Debug builds incompatible with ThreadSanitizer and silently
+    # changes the instrumentation requested by downstream consumers.
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g3 -O0")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-no_pie,")
 else()
   if("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")

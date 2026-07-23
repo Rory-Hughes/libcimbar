@@ -11,9 +11,13 @@ public:
 	static const unsigned _headerSize = 6;
 
 public:
-	fountain_decoder_stream(unsigned data_size, unsigned buffer_size, unsigned maximum_unique_blocks=0U)
+	fountain_decoder_stream(
+	    unsigned data_size,
+	    unsigned buffer_size,
+	    unsigned maximum_unique_blocks=0U,
+	    unsigned maximum_block_id=std::numeric_limits<std::uint16_t>::max())
 	    : _buffer(buffer_size, 0)
-	    , _decoder(data_size, block_size(), maximum_unique_blocks)
+	    , _decoder(data_size, block_size(), maximum_unique_blocks, maximum_block_id)
 	{
 	}
 

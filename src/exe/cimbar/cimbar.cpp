@@ -129,8 +129,13 @@ int decode(const FilenameIterable& infiles, const std::function<int(cv::UMat, bo
 		if (inf.empty())
 			continue;
 		bool shouldPreprocess = (preprocess == 1);
-		cv::UMat img = cv::imread(inf).getUMat(cv::ACCESS_RW);
-		cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+		cv::Mat decoded = cimbar::load_img_file(inf);
+		if (decoded.empty())
+		{
+			err |= 1;
+			continue;
+		}
+		cv::UMat img = decoded.getUMat(cv::ACCESS_RW);
 
 		if (!no_deskew)
 		{

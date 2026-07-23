@@ -32,7 +32,9 @@ TEST_CASE( "ExtractorTest/testExtractMid", "[unit]" )
 
 	cv::Mat out = cv::imread(imgPath);
 	cv::cvtColor(out, out, cv::COLOR_BGR2RGB);
-	assertEquals( 0xc7f8205e686bc02, image_hash::average_hash(out) );
+	// The bounded stb JPEG decoder differs from OpenCV by one average-hash bit
+	// for this fixture; retain the exact post-migration regression value.
+	assertEquals( 0xc7f8205e682bc02, image_hash::average_hash(out) );
 }
 
 TEST_CASE( "ExtractorTest/testExtractUpscale", "[unit]" )
@@ -47,4 +49,3 @@ TEST_CASE( "ExtractorTest/testExtractUpscale", "[unit]" )
 	cv::cvtColor(out, out, cv::COLOR_BGR2RGB);
 	assertEquals( 0x29c64eaca3356394, image_hash::average_hash(out) );
 }
-

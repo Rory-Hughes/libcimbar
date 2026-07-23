@@ -2,9 +2,11 @@
 #pragma once
 
 #include "Decoder.h"
+#include "cimb_translator/Common.h"
 #include "util/File.h"
 
 #include <opencv2/opencv.hpp>
+#include <limits>
 #include <string>
 
 class DecoderPlus : public Decoder
@@ -21,10 +23,13 @@ public:
 
 inline unsigned DecoderPlus::decode(std::string filename, std::string output)
 {
-	cv::Mat img = cv::imread(filename);
-	cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+	cv::Mat img = cimbar::load_img_file(filename);
+	if (img.empty())
+		return 0;
 
 	std::ofstream f(output, std::ios::binary);
+	if (!f)
+		return 0;
 	return Decoder::decode(img, f, false);
 }
 
@@ -47,10 +52,15 @@ inline bool DecoderPlus::save_ccm(std::string filename)
 		return false;
 
 	cv::Mat temp(_decoder.get_ccm().mat());
+	if (temp.empty() || !temp.isContinuous())
+		return false;
+
+	const std::size_t element_size = temp.elemSize();
+	if (element_size == 0U ||
+	    temp.total() > std::numeric_limits<unsigned>::max() / element_size)
+		return false;
+	const unsigned byte_count = static_cast<unsigned>(temp.total() * element_size);
 
 	File f(filename, true);
-	if (f.write(reinterpret_cast<const char*>(temp.data), temp.rows * temp.cols * temp.elemSize()) == 0)  // len will be 9*elemsize, but...
-		return false;
-	return true;
+	return f.write(reinterpret_cast<const char*>(temp.data), byte_count) == byte_count;
 }
-

@@ -7,6 +7,7 @@
 #include "util/MakeTempDirectory.h"
 
 #include "PicoSHA2/picosha2.h"
+#include <array>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -21,6 +22,30 @@ namespace {
 		picosha2::hash256(f, hash.begin(), hash.end());
 		return picosha2::bytes_to_hex_string(hash);
 	}
+}
+
+TEST_CASE( "DecoderTest/saveColorCorrectionMatrixWritesExactBytes", "[unit][security]" )
+{
+	MakeTempDirectory tempdir;
+	const auto input = tempdir.path() / "input.ccm";
+	const auto output = tempdir.path() / "output.ccm";
+	const std::array<float, 9> matrix{{
+		1.0F, 0.0F, 0.0F,
+		0.0F, 1.0F, 0.0F,
+		0.0F, 0.0F, 1.0F,
+	}};
+	{
+		std::ofstream f(input, std::ios::binary);
+		f.write(
+			reinterpret_cast<const char*>(matrix.data()),
+			static_cast<std::streamsize>(sizeof(matrix))
+		);
+	}
+
+	DecoderPlus decoder;
+	assertTrue(decoder.load_ccm(input.string()));
+	assertTrue(decoder.save_ccm(output.string()));
+	assertEquals(get_hash(input.string()), get_hash(output.string()));
 }
 
 TEST_CASE( "DecoderTest/testDecode", "[unit]" )

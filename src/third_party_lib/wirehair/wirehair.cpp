@@ -178,6 +178,26 @@ WIREHAIR_EXPORT WirehairCodec wirehair_decoder_create(
     return reinterpret_cast<WirehairCodec>(codec);
 }
 
+WIREHAIR_EXPORT WirehairResult wirehair_decoder_memory_required(
+    uint64_t messageBytes,
+    uint32_t blockBytes,
+    uint64_t* bytesOut)
+{
+    if (!bytesOut) {
+        return Wirehair_InvalidInput;
+    }
+    return wirehair::Codec::DecoderMemoryRequired(messageBytes, blockBytes, *bytesOut);
+}
+
+WIREHAIR_EXPORT uint64_t wirehair_decoder_memory_allocated(WirehairCodec codec)
+{
+    if (!codec) {
+        return 0;
+    }
+    const wirehair::Codec* decoder = reinterpret_cast<const wirehair::Codec*>(codec);
+    return decoder->DecoderMemoryAllocated();
+}
+
 WIREHAIR_EXPORT WirehairResult wirehair_decode(
     WirehairCodec   codec, ///< Codec object
     unsigned      blockId, ///< ID number of received block

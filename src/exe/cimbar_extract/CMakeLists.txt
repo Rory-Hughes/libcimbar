@@ -14,6 +14,7 @@ add_executable (
 target_link_libraries(cimbar_extract
 
 	extractor
+	cimb_translator
 
 	${OPENCV_LIBS}
 )

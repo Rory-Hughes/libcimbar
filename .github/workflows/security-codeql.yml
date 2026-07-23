@@ -1,0 +1,81 @@
+name: security-codeql
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - hardening-scaffold
+    paths:
+      - CMakeLists.txt
+      - CMakePresets.json
+      - src/**
+      - scripts/check-codeql-sarif.py
+      - .github/workflows/security-codeql.yml
+  pull_request:
+    paths:
+      - CMakeLists.txt
+      - CMakePresets.json
+      - src/**
+      - scripts/check-codeql-sarif.py
+      - .github/workflows/security-codeql.yml
+  schedule:
+    - cron: "23 6 * * 1"
+
+permissions:
+  contents: read
+  packages: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: CodeQL C and C++ production surfaces
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            clang \
+            cmake \
+            ninja-build \
+            libopencv-dev \
+            libglfw3-dev \
+            libgles2-mesa-dev
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: c-cpp
+          build-mode: manual
+          queries: security-extended
+
+      - name: Configure production surfaces
+        run: cmake --preset codeql
+
+      - name: Build production surfaces
+        run: cmake --build --preset codeql
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:c-cpp
+          output: out/codeql-sarif
+
+      - name: Enforce first-party production gate
+        run: python3 scripts/check-codeql-sarif.py out/codeql-sarif
+
+      - name: Upload raw CodeQL evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-cpp-security-extended-sarif
+          path: out/codeql-sarif/*.sarif
+          if-no-files-found: error

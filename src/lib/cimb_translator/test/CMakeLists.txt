@@ -35,5 +35,5 @@ target_link_libraries(cimb_translator_test
 	cimb_translator
 
 	${OPENCV_LIBS}
+	${CPPFILESYSTEM}
 )
-

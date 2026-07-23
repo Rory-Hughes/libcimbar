@@ -2,7 +2,10 @@
 #include "unittest.h"
 
 #include "Common.h"
+#include "TestHelpers.h"
+#include "util/MakeTempDirectory.h"
 
+#include <fstream>
 #include <limits>
 #include <vector>
 
@@ -43,4 +46,31 @@ TEST_CASE( "CommonTest/rejectInvalidInput", "[unit]" )
 	    invalid,
 	    static_cast<std::size_t>(std::numeric_limits<int>::max()) + 1U
 	).empty());
+}
+
+TEST_CASE( "CommonTest/loadBoundedImageFile", "[unit]" )
+{
+	cv::Mat decoded = cimbar::load_img_file(TestCimbar::getSample("mycell.png"));
+
+	REQUIRE_FALSE(decoded.empty());
+	REQUIRE(decoded.cols > 0);
+	REQUIRE(decoded.rows > 0);
+	REQUIRE(decoded.channels() == 3);
+	REQUIRE(cimbar::load_img_file(TestCimbar::getSample("does-not-exist.png")).empty());
+
+	MakeTempDirectory tempdir;
+	const auto malformed_path = tempdir.path() / "malformed.img";
+	{
+		std::ofstream malformed(malformed_path, std::ios::binary);
+		malformed.write("nope", 4);
+	}
+	REQUIRE(cimbar::load_img_file(malformed_path.string()).empty());
+
+	const auto oversized_path = tempdir.path() / "oversized.img";
+	{
+		std::ofstream oversized(oversized_path, std::ios::binary);
+		oversized.seekp(static_cast<std::streamoff>(64U) * 1024 * 1024);
+		oversized.put('\0');
+	}
+	REQUIRE(cimbar::load_img_file(oversized_path.string()).empty());
 }

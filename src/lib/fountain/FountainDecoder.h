@@ -3,8 +3,10 @@
 
 #include "FountainInit.h"
 #include "wirehair/wirehair.h"
+#include <algorithm>
 #include <optional>
-#include <set>
+#include <limits>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
@@ -13,14 +15,40 @@
 class FountainDecoder
 {
 public:
-	FountainDecoder(size_t length, size_t packet_size, unsigned maximum_unique_blocks=0U)
+	static std::optional<std::size_t> decoder_memory_required(
+	    std::size_t length,
+	    std::size_t packet_size)
+	{
+		if (packet_size > std::numeric_limits<std::uint32_t>::max())
+			return std::nullopt;
+		std::uint64_t required = 0U;
+		if (wirehair_decoder_memory_required(length, static_cast<std::uint32_t>(packet_size), &required)
+		    != Wirehair_Success || required > std::numeric_limits<std::size_t>::max())
+			return std::nullopt;
+		return static_cast<std::size_t>(required);
+	}
+
+	FountainDecoder(
+	    size_t length,
+	    size_t packet_size,
+	    unsigned maximum_unique_blocks=0U,
+	    unsigned maximum_block_id=std::numeric_limits<std::uint16_t>::max())
 	    : _length(length)
 	    , _packetSize(packet_size)
 	    , _maximumUniqueBlocks(maximum_unique_blocks)
+	    , _maximumBlockId(std::min<unsigned>(
+	          maximum_block_id,
+	          std::numeric_limits<std::uint16_t>::max()))
+	    , _seenBlockWords(static_cast<std::size_t>(_maximumBlockId) / 64U + 1U, 0U)
 	{
 		FountainInit::init();
-		if (_length > 0U && _packetSize > 0U)
-			_codec = wirehair_decoder_create(nullptr, _length, _packetSize);
+		if (_length > 0U && _packetSize > 0U &&
+		    _packetSize <= std::numeric_limits<std::uint32_t>::max())
+			_codec = wirehair_decoder_create(
+			    nullptr,
+			    _length,
+			    static_cast<std::uint32_t>(_packetSize)
+			);
 	}
 
 	FountainDecoder(const FountainDecoder&) = delete;
@@ -32,7 +60,9 @@ public:
 	    , _length(other._length)
 	    , _packetSize(other._packetSize)
 	    , _maximumUniqueBlocks(other._maximumUniqueBlocks)
-	    , _seenBlocks(std::move(other._seenBlocks))
+	    , _maximumBlockId(other._maximumBlockId)
+	    , _seenBlockCount(other._seenBlockCount)
+	    , _seenBlockWords(std::move(other._seenBlockWords))
 	{
 	}
 
@@ -46,7 +76,9 @@ public:
 			_length = other._length;
 			_packetSize = other._packetSize;
 			_maximumUniqueBlocks = other._maximumUniqueBlocks;
-			_seenBlocks = std::move(other._seenBlocks);
+			_maximumBlockId = other._maximumBlockId;
+			_seenBlockCount = other._seenBlockCount;
+			_seenBlockWords = std::move(other._seenBlockWords);
 		}
 		return *this;
 	}
@@ -58,7 +90,7 @@ public:
 
 	unsigned progress() const
 	{
-		return _seenBlocks.size();
+		return _seenBlockCount;
 	}
 
 	size_t length() const
@@ -71,12 +103,20 @@ public:
 		return _codec != nullptr;
 	}
 
+	std::size_t decoder_memory_allocated() const
+	{
+		const std::uint64_t allocated = wirehair_decoder_memory_allocated(_codec);
+		return allocated <= std::numeric_limits<std::size_t>::max()
+		    ? static_cast<std::size_t>(allocated)
+		    : std::numeric_limits<std::size_t>::max();
+	}
+
 	WirehairResult last_result() const
 	{
 		return _res;
 	}
 
-	bool decode(unsigned block_num, uint8_t* data, size_t length)
+	bool decode(unsigned block_num, const uint8_t* data, size_t length)
 	{
 		if (!good() || data == nullptr || length == 0U || length > _packetSize)
 		{
@@ -84,17 +124,26 @@ public:
 			return false;
 		}
 
-		if (_maximumUniqueBlocks > 0U && _seenBlocks.size() >= _maximumUniqueBlocks)
+		if (block_num > _maximumBlockId ||
+		    (_maximumUniqueBlocks > 0U && _seenBlockCount >= _maximumUniqueBlocks))
 		{
 			_res = Wirehair_InvalidInput;
 			return false;
 		}
 
-		auto pear = _seenBlocks.insert(block_num);
-		if (!pear.second)
+		const std::size_t word_index = static_cast<std::size_t>(block_num) / 64U;
+		const std::uint64_t mask = std::uint64_t{1U} << (block_num % 64U);
+		if ((_seenBlockWords[word_index] & mask) != 0U)
 			return false;
+		_seenBlockWords[word_index] |= mask;
+		++_seenBlockCount;
 
-		_res = wirehair_decode(_codec, block_num, data, length);
+		_res = wirehair_decode(
+		    _codec,
+		    block_num,
+		    data,
+		    static_cast<std::uint32_t>(length)
+		);
 		if (_res != Wirehair_Success)
 			return false;
 
@@ -130,5 +179,10 @@ protected:
 	size_t _length;
 	size_t _packetSize;
 	unsigned _maximumUniqueBlocks;
-	std::set<unsigned> _seenBlocks; // giving wirehair_decode the same block too many times can make it very, very upset
+	unsigned _maximumBlockId;
+	unsigned _seenBlockCount = 0U;
+	// The wire format carries a 16-bit block identifier. A fixed-index bitmap
+	// bounds duplicate tracking to at most 8 KiB instead of one allocation per
+	// attacker-selected unique block.
+	std::vector<std::uint64_t> _seenBlockWords;
 };

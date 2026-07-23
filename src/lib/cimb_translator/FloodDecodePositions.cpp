@@ -59,7 +59,8 @@ FloodDecodePositions::iter FloodDecodePositions::next()
 
 		needsDecode = false;
 		++_count;
-		auto [drift, __, cooldown] = _instructions[i];
+		auto [drift, ignored_instruction, cooldown] = _instructions[i];
+		(void)ignored_instruction;
 		return {i, _positions[i], drift, cooldown};
 	}
 

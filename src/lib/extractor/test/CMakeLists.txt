@@ -28,6 +28,7 @@ add_test(extractor_test extractor_test)
 
 target_link_libraries(extractor_test
 	extractor
+	cimb_translator
 
 	${OPENCV_LIBS}
 	${CPPFILESYSTEM}

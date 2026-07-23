@@ -211,7 +211,7 @@ protected:
 
 		// Setup VBO
 		glBindBuffer(GL_ARRAY_BUFFER, _vbo);
-		glBufferData(GL_ARRAY_BUFFER, 6 * 3 * sizeof(GLfloat), PLANE, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(PLANE), PLANE, GL_STATIC_DRAW);
 
 		// Setup VAO
 		GLint vertexPositionAttribute = glGetAttribLocation(_p.id(), "vert");

@@ -50,6 +50,9 @@ int Scanner::anchor_size() const
 
 bool Scanner::test_pixel(int x, int y) const
 {
+	if (_img.empty() || x < 0 || y < 0 || x >= _img.cols || y >= _img.rows)
+		return false;
+
 	uchar pixel = _img.at<uchar>(y, x);
 	if (_dark)
 		return pixel > 127;
@@ -141,6 +144,11 @@ bool Scanner::sort_top_to_bottom(std::vector<Anchor>& anchors)
 
 bool Scanner::add_bottom_right_corner(std::vector<Anchor>& anchors, unsigned cutoff)
 {
+	if (anchors.size() < 3)
+		return false;
+	if (anchors[0].max_range() <= 0 || anchors[1].max_range() <= 0 || anchors[2].max_range() <= 0)
+		return false;
+
 	double topScalar = anchors[2].max_range() / std::max<double>(anchors[1].max_range(), anchors[0].max_range());
 	point<int> topEdge = (anchors[1].center() - anchors[0].center()) * topScalar;
 	point<int> guess1 = anchors[2].center() + topEdge;
@@ -165,7 +173,8 @@ bool Scanner::add_bottom_right_corner(std::vector<Anchor>& anchors, unsigned cut
 
 	std::vector<Anchor> candidates;
 	t1_scan_rows<ScanState_122>([&] (const Anchor& p) {
-		on_t1_scan<ScanState_122>(p, candidates, false);
+		if (candidates.size() < max_candidates_per_stage)
+			on_t1_scan<ScanState_122>(p, candidates, false);
 	}, skip, ystart, yend, xstart, xend);
 
 	if (candidates.size() == 0)
@@ -183,7 +192,8 @@ bool Scanner::add_bottom_right_corner(std::vector<Anchor>& anchors, unsigned cut
 unsigned Scanner::scan_primary(std::vector<Anchor>& candidates)
 {
 	t1_scan_rows<ScanState_114>([&] (const Anchor& p) {
-		on_t1_scan<ScanState_114>(p, candidates, true);
+		if (candidates.size() < max_candidates_per_stage)
+			on_t1_scan<ScanState_114>(p, candidates, true);
 	});
 
 	unsigned cutoff = filter_candidates(candidates);

@@ -30,6 +30,21 @@
       }
     },
     {
+      "name": "hardened-transport",
+      "displayName": "Hardened byte-only fountain transport",
+      "inherits": "security-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "LIBCIMBAR_HARDENED_TRANSPORT_ONLY": "ON",
+        "LIBCIMBAR_BUILD_GUI_TOOLS": "OFF",
+        "LIBCIMBAR_BUILD_HARDENED_TRANSPORT": "ON",
+        "LIBCIMBAR_BUILD_LINUX_SANDBOX_PROTOTYPE": "ON",
+        "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON"
+      }
+    },
+    {
       "name": "tsan",
       "displayName": "Clang ThreadSanitizer",
       "inherits": "security-base",
@@ -42,6 +57,35 @@
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread",
         "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=thread"
       }
+    },
+    {
+      "name": "memory-sanitizer",
+      "displayName": "Clang MemorySanitizer hardened transport",
+      "inherits": "security-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_C_FLAGS": "-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fPIE",
+        "CMAKE_CXX_FLAGS": "-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fPIE",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=memory -pie",
+        "LIBCIMBAR_HARDENED_TRANSPORT_ONLY": "ON",
+        "LIBCIMBAR_BUILD_GUI_TOOLS": "OFF",
+        "LIBCIMBAR_BUILD_HARDENED_TRANSPORT": "ON",
+        "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON"
+      }
+    },
+    {
+      "name": "codeql",
+      "displayName": "CodeQL production C and C++ surfaces",
+      "inherits": "security-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "LIBCIMBAR_BUILD_GUI_TOOLS": "ON",
+        "LIBCIMBAR_BUILD_HARDENED_TRANSPORT": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -51,9 +95,43 @@
       "jobs": 4
     },
     {
+      "name": "hardened-transport",
+      "configurePreset": "hardened-transport",
+      "jobs": 4,
+      "targets": [
+        "verify_hardened_transport"
+      ]
+    },
+    {
       "name": "tsan",
       "configurePreset": "tsan",
-      "jobs": 4
+      "jobs": 4,
+      "targets": [
+        "fountain_test",
+        "fountain_init_concurrency_test"
+      ]
+    },
+    {
+      "name": "memory-sanitizer",
+      "configurePreset": "memory-sanitizer",
+      "jobs": 4,
+      "targets": [
+        "hardened_transport_profile_test"
+      ]
+    },
+    {
+      "name": "codeql",
+      "configurePreset": "codeql",
+      "jobs": 4,
+      "targets": [
+        "cimbar",
+        "cimbar_extract",
+        "build_image_assets",
+        "cimbar_recv",
+        "cimbar_recv2",
+        "cimbar_send",
+        "cimbar_hardened_transport"
+      ]
     }
   ],
   "testPresets": [
@@ -69,6 +147,18 @@
       }
     },
     {
+      "name": "hardened-transport",
+      "configurePreset": "hardened-transport",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "include": {
+          "name": "^hardened_transport_(profile_test|verifier_rejects_forbidden|sandbox_probe)$"
+        }
+      }
+    },
+    {
       "name": "tsan",
       "configurePreset": "tsan",
       "output": {
@@ -76,6 +166,21 @@
       },
       "environment": {
         "TSAN_OPTIONS": "halt_on_error=1:second_deadlock_stack=1"
+      }
+    },
+    {
+      "name": "memory-sanitizer",
+      "configurePreset": "memory-sanitizer",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "MSAN_OPTIONS": "halt_on_error=1:exit_code=86:poison_in_dtor=1"
+      },
+      "filter": {
+        "include": {
+          "name": "^hardened_transport_profile_test$"
+        }
       }
     }
   ]

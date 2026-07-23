@@ -11,6 +11,8 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <fstream>
+#include <stdexcept>
 #include <string>
 #include "bitmaps.h"
 
@@ -105,7 +107,7 @@ namespace detail {
 cv::Mat decode_image(const uint8_t* data, std::size_t size)
 {
 	static constexpr int maximum_dimension = 4096;
-	static constexpr std::size_t maximum_pixels = 16U * 1024U * 1024U;
+	static constexpr std::size_t maximum_pixels = std::size_t{16U} * 1024U * 1024U;
 	static constexpr int output_channels = STBI_rgb_alpha;
 
 	if (data == nullptr || size == 0U ||
@@ -161,6 +163,38 @@ cv::Mat load_img(string path)
 	string bytes = base91::decode(it->second);
 	vector<unsigned char> data(bytes.data(), bytes.data() + bytes.size());
 	return detail::decode_image(data.data(), data.size());
+}
+
+cv::Mat load_img_file(const std::string& path)
+{
+	static constexpr std::size_t maximum_encoded_bytes = std::size_t{64U} * 1024U * 1024U;
+
+	try
+	{
+		std::ifstream input(path, std::ios::binary | std::ios::ate);
+		if (!input)
+			return cv::Mat();
+
+		const std::streamoff end = input.tellg();
+		if (end <= 0 || end > static_cast<std::streamoff>(maximum_encoded_bytes))
+			return cv::Mat();
+
+		const std::size_t size = static_cast<std::size_t>(end);
+		std::vector<std::uint8_t> encoded(size);
+		input.seekg(0, std::ios::beg);
+		if (!input.read(reinterpret_cast<char*>(encoded.data()), static_cast<std::streamsize>(size)))
+			return cv::Mat();
+
+		return detail::decode_image(encoded.data(), encoded.size());
+	}
+	catch (const std::bad_alloc&)
+	{
+		return cv::Mat();
+	}
+	catch (const std::length_error&)
+	{
+		return cv::Mat();
+	}
 }
 
 RGB getColor(unsigned index, unsigned num_colors, unsigned color_mode)

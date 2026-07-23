@@ -1,0 +1,74 @@
+name: security-dependencies
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - hardening-scaffold
+    paths:
+      - osv-scanner-custom.json
+      - osv-scanner.toml
+      - vcpkg.json
+      - CMakeLists.txt
+      - CMakePresets.json
+      - src/**
+      - test/catch.hpp
+      - scripts/check-dependency-lock.py
+      - scripts/generate-sbom.ps1
+      - docs/security/sbom/libcimbar.spdx.json
+      - .github/workflows/security-dependencies.yml
+  pull_request:
+    paths:
+      - osv-scanner-custom.json
+      - osv-scanner.toml
+      - vcpkg.json
+      - CMakeLists.txt
+      - CMakePresets.json
+      - src/**
+      - test/catch.hpp
+      - scripts/check-dependency-lock.py
+      - scripts/generate-sbom.ps1
+      - docs/security/sbom/libcimbar.spdx.json
+      - .github/workflows/security-dependencies.yml
+  merge_group:
+    types:
+      - checks_requested
+  schedule:
+    - cron: "41 6 * * 1"
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  verify-lock:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Verify SPDX catalog and vendored source digests
+        shell: pwsh
+        run: ./scripts/generate-sbom.ps1 -Check
+      - name: Verify dependency coordinates agree
+        run: python3 scripts/check-dependency-lock.py
+
+  scan-current:
+    needs: verify-lock
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@3adb4b14a2b0623876d18d863a498b785fb3752d # v2.3.8
+    with:
+      scan-args: |-
+        --lockfile=osv-scanner:./osv-scanner-custom.json
+      fail-on-vuln: true
+      upload-sarif: true
+
+  scan-change:
+    needs: verify-lock
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@3adb4b14a2b0623876d18d863a498b785fb3752d # v2.3.8
+    with:
+      scan-args: |-
+        --lockfile=osv-scanner:./osv-scanner-custom.json
+      fail-on-vuln: true
+      upload-sarif: true

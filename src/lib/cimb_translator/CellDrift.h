@@ -10,7 +10,7 @@ class CellDrift
 public:
 	CellDrift(int x=0, int y=0);
 
-	inline static const std::array<std::pair<int, int>, 9> driftPairs = {{
+	inline static constexpr std::array<std::pair<int, int>, 9> driftPairs = {{
 		{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {0, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}
 	}};
 

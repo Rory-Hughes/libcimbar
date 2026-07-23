@@ -2858,22 +2858,36 @@ WirehairResult Codec::ChooseMatrix(
     CAT_IF_DUMP(cout << endl << "---- ChooseMatrix ----" << endl << endl;)
 
     // Validate input
-    if (message_bytes < 1 || block_bytes < 1) {
+    if (message_bytes < 1 || block_bytes < 1 || block_bytes > 0x7fffffffU) {
         return Wirehair_InvalidInput;
     }
 
-    // Calculate message block count
+    // Calculate and validate the block count before narrowing it to uint16_t.
+    // A large message with a small block size could otherwise wrap into the
+    // accepted range and initialize a codec for the wrong matrix dimensions.
     _block_bytes = block_bytes;
-    _block_count = static_cast<uint16_t>((message_bytes + _block_bytes - 1) / _block_bytes);
-    _block_next_prime = NextPrime16(_block_count);
+    const uint64_t block_count_wide =
+        message_bytes / _block_bytes + (message_bytes % _block_bytes != 0 ? 1 : 0);
 
     // Validate block count
-    if (_block_count < CAT_WIREHAIR_MIN_N) {
+    if (block_count_wide < CAT_WIREHAIR_MIN_N) {
         return Wirehair_BadInput_SmallN;
     }
-    if (_block_count > CAT_WIREHAIR_MAX_N) {
+    if (block_count_wide > CAT_WIREHAIR_MAX_N) {
         return Wirehair_BadInput_LargeN;
     }
+
+#if SIZE_MAX < UINT64_MAX
+    // Matrix row offsets must also be representable by callers on 32-bit hosts.
+    const uint64_t max_block_index =
+        block_count_wide + CAT_MAX_DENSE_ROWS + kHeavyRows + 1;
+    if (max_block_index * block_bytes > static_cast<uint64_t>(SIZE_MAX)) {
+        return Wirehair_InvalidInput;
+    }
+#endif
+
+    _block_count = static_cast<uint16_t>(block_count_wide);
+    _block_next_prime = NextPrime16(_block_count);
 
     CAT_IF_DUMP(cout << "Total message = " << message_bytes << " bytes.  Block bytes = " << _block_bytes << endl;)
     CAT_IF_DUMP(cout << "Block count = " << _block_count << " +Prime=" << _block_next_prime << endl;)
@@ -3599,6 +3613,79 @@ Codec::~Codec()
     FreeWorkspace();
     FreeMatrix();
     FreeInput();
+}
+
+WirehairResult Codec::DecoderMemoryRequired(
+    uint64_t message_bytes,
+    uint32_t block_bytes,
+    uint64_t& bytes_out)
+{
+    bytes_out = 0;
+    if (message_bytes < 1 || block_bytes < 1) {
+        return Wirehair_InvalidInput;
+    }
+
+    const uint64_t block_count_64 = message_bytes / block_bytes
+        + (message_bytes % block_bytes != 0 ? 1 : 0);
+    if (block_count_64 < CAT_WIREHAIR_MIN_N) {
+        return Wirehair_BadInput_SmallN;
+    }
+    if (block_count_64 > CAT_WIREHAIR_MAX_N) {
+        return Wirehair_BadInput_LargeN;
+    }
+
+    const uint64_t block_count = block_count_64;
+    const uint64_t extra_count = CAT_MAX_EXTRA_ROWS;
+    const uint64_t dense_count = GetDenseCount(static_cast<unsigned>(block_count));
+    const uint64_t mix_count = dense_count + kHeavyRows;
+
+    const uint64_t input_bytes = (block_count + extra_count) * block_bytes;
+
+    const uint64_t recovery_rows = block_count + mix_count + 1;
+    const uint64_t recovery_bytes = recovery_rows * block_bytes;
+    const uint64_t peel_offset = (recovery_bytes + 7) & ~UINT64_C(7);
+    const uint64_t workspace_bytes = peel_offset
+        + sizeof(PeelRow) * (block_count + extra_count)
+        + sizeof(PeelColumn) * block_count
+        + sizeof(PeelRefs) * block_count
+        + block_count + extra_count;
+
+    // Greedy peeling can conservatively defer every input column.  Using N as
+    // the defer count makes this an upper bound independent of received IDs.
+    const uint64_t defer_count = block_count;
+    const uint64_t ge_cols = defer_count + mix_count;
+    const uint64_t ge_rows = defer_count + dense_count + extra_count + 1;
+    const uint64_t ge_pitch = (ge_cols + 63) / 64;
+    const uint64_t ge_matrix_words = ge_rows * ge_pitch;
+    const uint64_t compress_matrix_words = block_count * ge_pitch;
+    const uint64_t pivot_count = ge_cols + extra_count;
+    const uint64_t pivot_words = pivot_count * 2 + ge_cols;
+    const uint64_t heavy_rows = kHeavyRows + extra_count;
+    const uint64_t heavy_cols = mix_count < kHeavyCols ? mix_count : kHeavyCols;
+    const uint64_t heavy_pitch = (heavy_cols + 6) & ~UINT64_C(3);
+    const uint64_t matrix_bytes =
+        (compress_matrix_words + ge_matrix_words) * sizeof(uint64_t)
+        + heavy_pitch * heavy_rows
+        + pivot_words * sizeof(uint16_t);
+
+    // SIMDSafeAllocate requests GF256_ALIGN_BYTES beyond each payload.
+    bytes_out = sizeof(Codec)
+        + input_bytes + GF256_ALIGN_BYTES
+        + workspace_bytes + GF256_ALIGN_BYTES
+        + matrix_bytes + GF256_ALIGN_BYTES;
+    return Wirehair_Success;
+}
+
+uint64_t Codec::DecoderMemoryAllocated() const
+{
+    uint64_t bytes = sizeof(Codec);
+    if (_input_allocated > 0)
+        bytes += _input_allocated + GF256_ALIGN_BYTES;
+    if (_workspace_allocated > 0)
+        bytes += _workspace_allocated + GF256_ALIGN_BYTES;
+    if (_ge_allocated > 0)
+        bytes += _ge_allocated + GF256_ALIGN_BYTES;
+    return bytes;
 }
 
 void Codec::SetInput(const void * GF256_RESTRICT message_in)

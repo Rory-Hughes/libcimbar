@@ -3,6 +3,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <cstddef>
+#include <cstdint>
 #include <tuple>
 
 class Cell
@@ -26,114 +28,24 @@ public:
 		, _rows(rows)
 	{}
 
-	// it would be nice to use a cropped cv::Mat to get the contiguous memory pointer...
 	std::tuple<uchar,uchar,uchar> mean_rgb_continuous(bool skip) const
 	{
-		uint16_t blue = 0;
-		uint16_t green = 0;
-		uint16_t red = 0;
-		uint16_t count = 0;
-
-		int channels = _img.channels();
-		int index = (_ystart * _img.cols) + _xstart;
-		const uchar* p = _img.ptr<uchar>(0) + (index * channels);
-
-		int increment = 1 + skip;
-		int toNextRow = channels * (_img.cols - _cols);
-		if (skip)
-			toNextRow += channels * _img.cols;
-
-		for (int i = 0; i < _rows; i+=increment)
-		{
-			for (int j = 0; j < _cols; ++j, ++count)
-			{
-				red += p[0];
-				green += p[1];
-				blue += p[2];
-				p += channels;
-			}
-			p += toNextRow;
-		}
-
-		if (!count)
-			return std::tuple<uchar,uchar,uchar>(0, 0, 0);
-
-		return std::tuple<uchar,uchar,uchar>(red/count, green/count, blue/count);
+		return mean_rgb_region(skip);
 	}
 
 	std::tuple<uchar,uchar,uchar> mean_rgb(bool skip=false) const
 	{
-		int channels = _img.channels();
-		if (channels < 3)
-			return std::tuple<uchar,uchar,uchar>(0, 0, 0);
-		if (_img.isContinuous() and _cols > 0)
-			return mean_rgb_continuous(skip);
-
-		uint16_t blue = 0;
-		uint16_t green = 0;
-		uint16_t red = 0;
-		uint16_t count = 0;
-
-		int increment = 1 + skip;
-		int yend = _img.rows * _img.channels();
-		for (int i = 0; i < _img.cols; i+=increment)
-		{
-			const uchar* p = _img.ptr<uchar>(i);
-			for (int j = 0; j < yend; j+=_img.channels(), ++count)
-			{
-				red += p[j];
-				green += p[j+1];
-				blue += p[j+2];
-			}
-		}
-
-		if (!count)
-			return std::tuple<uchar,uchar,uchar>(0, 0, 0);
-
-		return std::tuple<uchar,uchar,uchar>(red/count, green/count, blue/count);
+		return mean_rgb_region(skip);
 	}
 
 	uchar mean_grayscale_continuous() const
 	{
-		uint16_t total = 0;
-		uint16_t count = 0;
-
-		int index = (_ystart * _img.cols) + _xstart;
-		const uchar* p = _img.ptr<uchar>(0) + index;
-		int toNextCol = _img.rows - _rows;
-
-		for (int i = 0; i < _img.cols; ++i)
-		{
-			for (int j = 0; j < _img.rows; ++j, ++count)
-				total += p[count];
-			count += toNextCol;
-		}
-
-		if (!count)
-			return 0;
-		return (uchar)(total/count);
+		return mean_grayscale_region();
 	}
 
 	uchar mean_grayscale() const
 	{
-		if (_img.channels() > 1)
-			return 0;
-		if (_img.isContinuous() and _cols > 0)
-			return mean_grayscale_continuous();
-
-		uint16_t total = 0;
-		uint16_t count = 0;
-
-		for (int i = 0; i < _img.cols; ++i)
-		{
-			const uchar* p = _img.ptr<uchar>(i);
-			for (int j = 0; j < _img.rows; ++j, ++count)
-				total += p[j];
-		}
-
-		if (!count)
-			return 0;
-		return (uchar)(total/count);
+		return mean_grayscale_region();
 	}
 
 	void crop(int x, int y, int cols, int rows)
@@ -155,6 +67,70 @@ public:
 	}
 
 protected:
+	bool valid_region(int minimum_channels, int maximum_channels) const
+	{
+		if (_img.empty() || _img.depth() != CV_8U ||
+		    _img.channels() < minimum_channels || _img.channels() > maximum_channels ||
+		    _xstart < 0 || _ystart < 0 || _cols <= 0 || _rows <= 0 ||
+		    _xstart > _img.cols || _ystart > _img.rows)
+			return false;
+
+		return _cols <= _img.cols - _xstart && _rows <= _img.rows - _ystart;
+	}
+
+	std::tuple<uchar,uchar,uchar> mean_rgb_region(bool skip) const
+	{
+		if (!valid_region(3, CV_CN_MAX))
+			return std::tuple<uchar,uchar,uchar>(0, 0, 0);
+
+		std::uint64_t first = 0U;
+		std::uint64_t second = 0U;
+		std::uint64_t third = 0U;
+		std::size_t count = 0U;
+		const int channels = _img.channels();
+		const int row_increment = skip ? 2 : 1;
+		const std::size_t start_offset =
+		    static_cast<std::size_t>(_xstart) * static_cast<std::size_t>(channels);
+
+		for (int row = 0; row < _rows; row += row_increment)
+		{
+			const uchar* pixels = _img.ptr<uchar>(_ystart + row) + start_offset;
+			for (int column = 0; column < _cols; ++column, ++count)
+			{
+				const std::size_t offset =
+				    static_cast<std::size_t>(column) * static_cast<std::size_t>(channels);
+				first += pixels[offset];
+				second += pixels[offset + 1U];
+				third += pixels[offset + 2U];
+			}
+		}
+
+		if (count == 0U)
+			return std::tuple<uchar,uchar,uchar>(0, 0, 0);
+		return std::tuple<uchar,uchar,uchar>(
+		    static_cast<uchar>(first / count),
+		    static_cast<uchar>(second / count),
+		    static_cast<uchar>(third / count)
+		);
+	}
+
+	uchar mean_grayscale_region() const
+	{
+		if (!valid_region(1, 1))
+			return 0;
+
+		std::uint64_t total = 0U;
+		std::size_t count = 0U;
+		for (int row = 0; row < _rows; ++row)
+		{
+			const uchar* pixels = _img.ptr<uchar>(_ystart + row) + _xstart;
+			for (int column = 0; column < _cols; ++column, ++count)
+				total += pixels[column];
+		}
+
+		return count == 0U ? 0 : static_cast<uchar>(total / count);
+	}
+
 	const cv::Mat& _img;
 	int _xstart = 0;
 	int _ystart = 0;

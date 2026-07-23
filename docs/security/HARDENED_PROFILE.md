@@ -71,12 +71,57 @@ explicit object class and decoder limits. The session exposes only status,
 frame submission, cancellation/reset, and a single-take exact-length byte
 vector. It has no output callback, filename, path, decompression, or filesystem
 interface. Any negative decoder result fails the session closed and clears
-partial state; explicit reset is required before reuse.
+partial state; explicit reset is required before reuse. Decoder-state and
+completed-output allocation failures are contained at this boundary, as is
+output recovery refusal. None can expose a partial object, and all require an
+explicit reset before the session accepts another frame.
+
+The policy must also select equal, non-zero
+`maximum_codec_memory_bytes` and `maximum_active_codec_memory_bytes` values.
+Before constructing Wirehair, the sink reserves a conservative decoder heap
+bound calculated inside the vendored codec. It covers the codec object, input
+staging, peeling workspace, worst-case deferred solve matrix, pivot/heavy data,
+and Wirehair's explicit alignment overhead. Admission over either the
+per-stream or aggregate budget fails without creating stream state. This is a
+codec-owned heap bound, not a replacement for a process memory limit. Duplicate
+tracking uses a policy-sized fixed-index bitmap after block-ID validation; its
+absolute 16-bit protocol maximum is 8 KiB per decoder and smaller product
+policies allocate proportionally less. With completed-transfer retention set to
+zero, successful recovery also skips compatibility filename construction.
 
 Generic file/decompression callbacks remain available only through
 `fountain_decoder_file_sink.h` for compatibility applications. The restricted
-header does not include those dependencies. The full raw-frame `DecoderSession`
-and dedicated product build target remain outstanding.
+header does not include those dependencies.
+
+### Compiled hardened transport artifact
+
+`cimbar_hardened_transport` is the compiled, byte-only product-profile façade
+for corrected fountain packets. Its public methods are limited to explicit
+policy construction, status, frame submission, one exact-byte take,
+cancellation, and reset. The CMake target links only Wirehair.
+
+Build and verify the release profile with:
+
+```bash
+cmake --preset hardened-transport
+cmake --build --preset hardened-transport
+ctest --preset hardened-transport
+```
+
+Every archive and linked profile-test build runs
+`cmake/VerifyHardenedTransportArtifact.cmake`. The build fails if artifact
+symbols or strings contain zstd, decompression callbacks, filename parsers,
+`std::filesystem`, file streams, browser compatibility output functions, or
+session test-fault controls. The named preset builds the always-executed
+`verify_hardened_transport` target, so changing only the verifier still forces
+a fresh scan.
+The profile test reconstructs exact message and wallet bytes and refuses a
+second take.
+
+The full raw-frame `DecoderSession` that composes checked camera ingress with
+this transport artifact remains outstanding. The current top-level configure
+also discovers OpenCV even when only the transport target is built, although
+OpenCV is not linked into the artifact.
 
 ## Initial object profiles
 
@@ -95,7 +140,7 @@ The Secure Core selects the profile before scanning starts. Optical metadata can
 
 - One active reconstruction in the initial version.
 - No persistent completed-object map.
-- Bounded duplicate tracking.
+- Policy-sized duplicate bitmap, capped at 8 KiB per decoder.
 - Conflicting object size or transfer identity invalidates the session.
 - No-progress threshold aborts the session.
 - Timeout aborts the session.
@@ -147,6 +192,50 @@ The decoder process or processor domain must have:
 - Memory and CPU limits.
 - A watchdog.
 - Process restart after each transfer where practical.
+
+### Linux sandbox prototype
+
+The `hardened-transport` preset now enables the opt-in
+`LIBCIMBAR_BUILD_LINUX_SANDBOX_PROTOTYPE` target on Linux x86_64. The
+`hardened_transport_sandbox_probe` executable is not linked into
+`cimbar_hardened_transport`; it is a deployment prototype that exercises the
+same corrected-packet `HardenedFountainTransport` boundary in a restricted
+child process.
+
+For each transfer, the parent forks a new child and enforces a watchdog. The
+child drops root to uid/gid 65534 when needed, verifies non-root execution and
+zero effective capabilities, sets `no_new_privs`, disables core dumps, applies
+memory, CPU, process-count, file-size, core, and descriptor limits, attempts
+network namespace isolation where permitted, and installs a seccomp-BPF
+allowlist before decoding. After exact reconstruction, deliberate escape probes
+for parent-secret file reads/writes, sockets, fork, exec, and uid 0 regain must
+all fail.
+
+This is the WP-11 process-isolation baseline for the future Secure Core split.
+The final service still needs production integration of the WP-12 IPC contract
+and Secure Core authentication.
+
+### OIP-to-SCP IPC contract
+
+`HardenedTransportIpc` defines the fixed WP-12 byte envelope between the
+optical ingress process, the sandboxed decoder boundary, and the Secure Core
+process. The parser accepts exactly one 24-byte little-endian header plus an
+optional opaque payload. Version, type, transfer generation, payload length,
+and fixed status code are explicit fields. Generation zero, reserved flags,
+unknown types, unknown status codes, length mismatches, and over-limit payloads
+fail closed before routing.
+
+Only `submit_frame` and `completed_object` may carry payload bytes.
+`cancel_transfer`, `reset_transfer`, `transfer_status`, and `transfer_failed`
+must have zero payload. Status and failure reports carry fixed numeric codes
+only; there is no pointer, filename, path, nested object, text diagnostic, or
+application command field in the IPC format. The parser allocates no memory and
+returns valid payloads only as an offset and length into the caller-owned input.
+
+The independent `fuzz_hardened_ipc` target and deterministic
+`fuzz/corpus/hardened_ipc/` seeds exercise the parser without OpenCV,
+Reed-Solomon, Wirehair, filesystem, zstd, or sandbox dependencies. The detailed
+contract is recorded in `docs/security/HARDENED_IPC.md`.
 
 ## Authentication boundary
 

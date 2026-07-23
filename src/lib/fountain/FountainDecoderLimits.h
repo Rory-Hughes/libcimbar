@@ -18,6 +18,11 @@ struct FountainDecoderLimits
 	unsigned maximum_object_size = protocol_maximum_object_size;
 	// Aggregate claimed reconstruction bytes; third-party codec overhead is separate.
 	std::size_t maximum_active_object_bytes = protocol_maximum_object_size;
+	// Zero keeps the generic compatibility surface unchanged. Product-facing
+	// policies must set both limits and are admitted using Wirehair's worst-case
+	// decoder heap estimate before codec construction.
+	std::size_t maximum_codec_memory_bytes = 0U;
+	std::size_t maximum_active_codec_memory_bytes = 0U;
 	unsigned maximum_active_streams = 1U;
 	unsigned maximum_completed_transfers = 8U;
 	unsigned maximum_unique_blocks = 0U;
@@ -32,10 +37,15 @@ struct FountainDecoderLimits
 
 	bool valid() const
 	{
+		const bool codec_limits_consistent =
+		    (maximum_codec_memory_bytes == 0U && maximum_active_codec_memory_bytes == 0U) ||
+		    (maximum_codec_memory_bytes > 0U &&
+		     maximum_active_codec_memory_bytes >= maximum_codec_memory_bytes);
 		return maximum_object_size > 0U &&
 		       maximum_object_size <= protocol_maximum_object_size &&
 		       maximum_active_object_bytes >= maximum_object_size &&
 		       maximum_active_streams > 0U &&
+		       codec_limits_consistent &&
 		       maximum_block_id <= protocol_maximum_block_id &&
 		       maximum_packets_per_frame > 0U &&
 		       maximum_frames_per_transfer > 0U &&
