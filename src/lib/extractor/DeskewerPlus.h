@@ -2,6 +2,7 @@
 #pragma once
 
 #include "Deskewer.h"
+#include "cimb_translator/Common.h"
 
 #include <opencv2/opencv.hpp>
 
@@ -19,8 +20,9 @@ protected:
 
 inline cv::Mat DeskewerPlus::deskew(std::string img, const Corners& corners)
 {
-	cv::Mat mat = cv::imread(img);
-	cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+	cv::Mat mat = cimbar::load_img_file(img);
+	if (mat.empty())
+		return cv::Mat();
 	return Deskewer::deskew(mat, corners);
 }
 

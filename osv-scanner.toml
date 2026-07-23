@@ -1,0 +1,38 @@
+# Time-limited, reachability-based exceptions for the compatibility OpenCV
+# package. scripts/check-dependency-lock.py fails if the exception set changes,
+# expires, or first-party production code reintroduces a vulnerable decode API.
+
+[[IgnoredVulns]]
+id = "OSV-2022-394"
+ignoreUntil = 2026-10-22
+reason = "First-party production code does not call the reported cv::split path."
+
+[[IgnoredVulns]]
+id = "OSV-2023-444"
+ignoreUntil = 2026-10-22
+reason = "The compatibility vcpkg feature set does not enable OpenJPEG, and the hardened transport excludes OpenCV."
+
+[[IgnoredVulns]]
+id = "OSV-2025-16"
+ignoreUntil = 2026-10-22
+reason = "Attacker-controlled file decoding uses bounded stb_image v2.30; OpenCV decoding remains test-only."
+
+[[IgnoredVulns]]
+id = "OSV-2025-17"
+ignoreUntil = 2026-10-22
+reason = "Attacker-controlled file decoding uses bounded stb_image v2.30; OpenCV decoding remains test-only."
+
+[[IgnoredVulns]]
+id = "OSV-2025-51"
+ignoreUntil = 2026-10-22
+reason = "Attacker-controlled file decoding uses bounded stb_image v2.30; OpenCV decoding remains test-only."
+
+[[IgnoredVulns]]
+id = "OSV-2025-68"
+ignoreUntil = 2026-10-22
+reason = "Attacker-controlled file decoding uses bounded stb_image v2.30; OpenCV decoding remains test-only."
+
+[[IgnoredVulns]]
+id = "OSV-2025-190"
+ignoreUntil = 2026-10-22
+reason = "Attacker-controlled file decoding uses bounded stb_image v2.30; OpenCV decoding remains test-only."

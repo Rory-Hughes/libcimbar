@@ -3,6 +3,12 @@ cmake_minimum_required(VERSION 3.10)
 project ( libcimbar )
 enable_testing()
 
+option(
+	LIBCIMBAR_HARDENED_TRANSPORT_ONLY
+	"Configure only the byte-only hardened fountain transport and its tests"
+	OFF
+)
+
 if (MSVC)
     add_compile_options(/FI "iso646.h")
 endif()
@@ -22,7 +28,11 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-Wall -Wextra -Wpedantic -Wdeprecated -g -O2 -fPIC")
 endif()
 
-if(DEFINED USE_WASM)  # wasm build needs OPENCV_DIR defined
+if(LIBCIMBAR_HARDENED_TRANSPORT_ONLY)
+	# The corrected-packet product boundary does not use the image stack. Keep
+	# OpenCV, GLFW, GLES headers, generic applications, and compatibility
+	# libraries out of both discovery and the configured build graph.
+elseif(DEFINED USE_WASM)  # wasm build needs OPENCV_DIR defined
 	set(DISABLE_TESTS true)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGF256_TARGET_MOBILE")
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-Os")
@@ -39,7 +49,7 @@ else()  # if not wasm, go find opencv. 3 or 4 should both work
 	include_directories(${OpenCV_INCLUDE_DIRS})
 endif()
 
-if(DEFINED BUILD_PORTABLE_LINUX)
+if(DEFINED BUILD_PORTABLE_LINUX AND NOT LIBCIMBAR_HARDENED_TRANSPORT_ONLY)
 	find_package(PkgConfig REQUIRED)
 	pkg_check_modules(OPENCV4 REQUIRED opencv4)
 	link_directories(${OPENCV4_STATIC_LIBRARY_DIRS})
@@ -48,11 +58,11 @@ if(DEFINED BUILD_PORTABLE_LINUX)
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -static-libstdc++ -static-libgcc")
 endif()
 
-if(NOT DEFINED OPENCV_LIBS)
+if(NOT DEFINED OPENCV_LIBS AND NOT LIBCIMBAR_HARDENED_TRANSPORT_ONLY)
 	set(OPENCV_LIBS "opencv_calib3d" "opencv_imgcodecs" "opencv_imgproc" "opencv_photo" "opencv_core" ${OPENCV4_STATIC_LIBRARIES})
 endif()
 
-if(WIN32)
+if(WIN32 AND NOT LIBCIMBAR_HARDENED_TRANSPORT_ONLY)
 	find_package(glfw3 CONFIG REQUIRED)
 
 	find_path(OPENGL_REGISTRY_INCLUDE_DIRS "GLES3/gl3.h")
@@ -74,6 +84,11 @@ if(MSVC)
 	set(CPPFILESYSTEM "")
 endif()
 
+if(LIBCIMBAR_HARDENED_TRANSPORT_ONLY)
+set(PROJECTS
+	src/third_party_lib/wirehair
+)
+else()
 set (PROJECTS
 	src/lib/bit_file
 	src/lib/chromatic_adaptation
@@ -96,6 +111,7 @@ set (PROJECTS
 	src/third_party_lib/wirehair
 	src/third_party_lib/zstd
 )
+endif()
 
 if(WIN32)
 	set(LIBCIMBAR_BUILD_GUI_TOOLS_DEFAULT OFF)
@@ -105,7 +121,12 @@ endif()
 option(LIBCIMBAR_BUILD_GUI_TOOLS "Build OpenGL/GLFW live send and receive tools" ${LIBCIMBAR_BUILD_GUI_TOOLS_DEFAULT})
 option(LIBCIMBAR_BUILD_HARDENED_TRANSPORT "Build the byte-only hardened fountain transport profile" ON)
 
-if(NOT DEFINED USE_WASM)
+if(LIBCIMBAR_HARDENED_TRANSPORT_ONLY)
+	set(LIBCIMBAR_BUILD_GUI_TOOLS OFF CACHE BOOL "Build OpenGL/GLFW live send and receive tools" FORCE)
+	set(LIBCIMBAR_BUILD_HARDENED_TRANSPORT ON CACHE BOOL "Build the byte-only hardened fountain transport profile" FORCE)
+endif()
+
+if(NOT DEFINED USE_WASM AND NOT LIBCIMBAR_HARDENED_TRANSPORT_ONLY)
 set(PROJECTS
 	${PROJECTS}
 
@@ -141,4 +162,3 @@ include_directories(
 foreach(proj ${PROJECTS})
 	add_subdirectory(${proj} build/${proj})
 endforeach()
-

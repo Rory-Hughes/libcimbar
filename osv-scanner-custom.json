@@ -1,0 +1,102 @@
+{
+  "results": [
+    {
+      "source": {
+        "path": "docs/security/DEPENDENCY_INVENTORY.md",
+        "type": "lockfile"
+      },
+      "packages": [
+        {
+          "package": {
+            "name": "github.com/r-lyeh-archived/base",
+            "commit": "9c50c57b46b9be1b028134a65e3f12d40516e9b1"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/jarro2783/cxxopts",
+            "commit": "302302b30839505703d37fb82f536c53cf9172fa"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/chfast/intx",
+            "commit": "4c1ca55d78777ffea7ede46e70cbd46a5beef008"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/quiet/libcorrect",
+            "commit": "f5a28c74fba7a99736fe49d3a5243eca29517ae9"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/kimwalisch/libpopcnt",
+            "commit": "5214d3fba1dcebd7ea36f0aed2731549d16d7df9"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/catid/wirehair",
+            "commit": "0d8b51da63c4f146112b46f225ffa34ac1183f16"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/facebook/zstd",
+            "commit": "63779c798237346c2b245c546c40b72a5a5913fe"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/okdshin/PicoSHA2",
+            "commit": "7bfa26156981f7181f240906495a2c33c7fa48be"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/fmtlib/fmt",
+            "commit": "407c905e45ad75fc29bf0f9bb7c5c2fd3475976f"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/cameron314/concurrentqueue",
+            "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/nothings/stb",
+            "commit": "31c1ad37456438565541f4919958214b6e762fb4"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/catchorg/Catch2",
+            "commit": "216713a4066b79d9803d374f261ccb30c0fb451f"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/opencv/opencv",
+            "commit": "31b0eeea0b44b370fd0712312df4214d4ae1b158"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/glfw/glfw",
+            "commit": "7b6aead9fb88b3623e3b3725ebb42670cbe4c579"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/KhronosGroup/OpenGL-Registry",
+            "commit": "3530768138c5ba3dfbb2c43c830493f632f7ea33"
+          }
+        }
+      ]
+    }
+  ]
+}

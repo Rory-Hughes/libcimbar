@@ -2,6 +2,7 @@
 #pragma once
 
 #include "Decoder.h"
+#include "cimb_translator/Common.h"
 #include "util/File.h"
 
 #include <opencv2/opencv.hpp>
@@ -22,10 +23,13 @@ public:
 
 inline unsigned DecoderPlus::decode(std::string filename, std::string output)
 {
-	cv::Mat img = cv::imread(filename);
-	cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+	cv::Mat img = cimbar::load_img_file(filename);
+	if (img.empty())
+		return 0;
 
 	std::ofstream f(output, std::ios::binary);
+	if (!f)
+		return 0;
 	return Decoder::decode(img, f, false);
 }
 

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "Extractor.h"
+#include "cimb_translator/Common.h"
 
 #include <opencv2/opencv.hpp>
 #include <string>
@@ -20,15 +21,18 @@ protected:
 
 inline int ExtractorPlus::extract(std::string read_path, cv::Mat& out)
 {
-	cv::Mat img = cv::imread(read_path);
-	cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+	cv::Mat img = cimbar::load_img_file(read_path);
+	if (img.empty())
+		return Extractor::FAILURE;
 	return Extractor::extract(img, out);
 }
 
 inline int ExtractorPlus::extract(std::string read_path, std::string write_path)
 {
-	cv::UMat img = cv::imread(read_path).getUMat(cv::ACCESS_FAST); // cv::USAGE_ALLOCATE_SHARED_MEMORY would be nice...;
-	cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+	cv::Mat decoded = cimbar::load_img_file(read_path);
+	if (decoded.empty())
+		return Extractor::FAILURE;
+	cv::UMat img = decoded.getUMat(cv::ACCESS_FAST); // cv::USAGE_ALLOCATE_SHARED_MEMORY would be nice...;
 
 	int res = Extractor::extract(img, img);
 

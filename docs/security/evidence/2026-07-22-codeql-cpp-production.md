@@ -35,14 +35,15 @@ hashes.
 
 ## Final result
 
-The database was deleted and recreated from a clean `out/build/codeql`
-directory after remediation. The final suite returned:
+The database was deleted and recreated from a clean build after remediation,
+then refreshed after the dependency and bounded file-loader changes. The final
+suite returned:
 
 ```text
-Total results:                   41
+Total results:                   42
 First-party production results:  0
-Vendored results:                41
-Vendored distribution:           fmt 1, stb 7, Wirehair 9, zstd 24
+Vendored results:                42
+Vendored distribution:           fmt 1, stb 8, Wirehair 9, zstd 24
 ```
 
 `scripts/check-codeql-sarif.py` independently accepted the generated SARIF
@@ -101,7 +102,7 @@ analysis. The local evidence database and final SARIF were retained under
 ## Closing verification
 
 ```text
-CodeQL security-extended:         0 first-party, 41 vendored
+CodeQL security-extended:         0 first-party, 42 vendored
 CodeQL SARIF ownership gate:      passed
 ASan/UBSan full suite:            12/12 passed
 Hardened release profile:          2/2 passed, archive and executable verified
@@ -113,7 +114,6 @@ SPDX SBOM regeneration/check:     passed
 
 ## Residual work
 
-- Identify immutable upstream revisions for every vendored dependency.
 - Re-evaluate all vendored findings when updating fmt, stb, Wirehair, or zstd.
 - Keep compatibility compression and image surfaces outside the hardened
   transport artifact unless their risk and resource policies are accepted.
